@@ -64,21 +64,27 @@ export class MailBoxUserScreen extends AbstractScreen {
 	 * @param {string} search
 	 * @returns {void}
 	 */
-	onRoute(folderHash, page, search) {
+	onRoute(folderHash, page, search, messageUid) {
 		const folder = getFolderFromCacheList(getFolderFullNameRaw(folderHash.replace(/~([\d]+)$/, '')));
 		if (folder) {
-			let threadUid = folderHash.replace(/^.+~([\d]+)$/, '$1');
-			if (folderHash === threadUid) {
-				threadUid = '';
+			if (messageUid) {
+//				rl.route.setHash(mailBox(folderHash, 1));
+				FolderUserStore.currentFolder(folder);
+				MessageUserStore.selectMessageByFolderAndUid(folderHash, messageUid);
+			} else {
+				let threadUid = folderHash.replace(/^.+~([\d]+)$/, '$1');
+				if (folderHash === threadUid) {
+					threadUid = '';
+				}
+
+				FolderUserStore.currentFolder(folder);
+
+				MessageUserStore.listPage(1 > page ? 1 : page);
+				MessageUserStore.listSearch(search);
+				MessageUserStore.listThreadUid(threadUid);
+
+				rl.app.reloadMessageList();
 			}
-
-			FolderUserStore.currentFolder(folder);
-
-			MessageUserStore.listPage(1 > page ? 1 : page);
-			MessageUserStore.listSearch(search);
-			MessageUserStore.listThreadUid(threadUid);
-
-			rl.app.reloadMessageList();
 		}
 	}
 
@@ -123,10 +129,17 @@ export class MailBoxUserScreen extends AbstractScreen {
 			fNormS = (request, vals) => [folder(request, vals), request ? pInt(vals[1]) : 1, decodeURI(pString(vals[2]))];
 
 		return [
+			// Folder: INBOX | Sent | 422ff435694c0d71cf9712bf43b768f5
 			[/^([^/]*)$/, { normalize_: fNormS }],
+			// Search: {folder}/{string}
 			[/^([a-zA-Z0-9~]+)\/(.+)\/?$/, { normalize_: (request, vals) =>
 				[folder(request, vals), 1, decodeURI(pString(vals[1]))]
 			}],
+			// Message: {folder}/m{uid}
+			[/^([a-zA-Z0-9~]+)\/m([1-9][0-9]*)\/?$/, { normalize_: (request, vals) =>
+				[folder(request, vals), 1, '', pString(vals[1])]
+			}],
+			// Page: {folder}/p{int}(/{search})?
 			[/^([a-zA-Z0-9~]+)\/p([1-9][0-9]*)(?:\/(.+)\/?)?$/, { normalize_: fNormS }]
 		];
 	}

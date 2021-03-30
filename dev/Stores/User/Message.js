@@ -17,7 +17,7 @@ import {
 	clearNewMessageCache
 } from 'Common/Cache';
 
-import { mailBox } from 'Common/Links';
+import { mailBox, mailBoxMessage } from 'Common/Links';
 import { i18n, getNotification } from 'Common/Translator';
 
 import { EmailCollectionModel } from 'Model/EmailCollection';
@@ -608,8 +608,10 @@ export const MessageUserStore = new class {
 	selectMessage(oMessage) {
 		if (oMessage) {
 			this.message(this.staticMessage.populateByMessageListItem(oMessage));
+			rl.route.setHash(mailBoxMessage(oMessage.folder, oMessage.uid), true);
 			this.populateMessageBody(this.message());
 		} else {
+//			rl.route.setHash(mailBox(this.message().folder), true);
 			this.message(null);
 		}
 	}

@@ -189,3 +189,16 @@ export function mailBox(folder, page = 1, search = '', threadUid = '') {
 	return result;
 }
 
+export function mailBoxMessage(folder, messageUid = '') {
+	let result = HASH_PREFIX + 'mailbox/';
+
+	if (folder) {
+		result += encodeURI(folder);
+	}
+
+	if (messageUid) {
+		result = result.replace(/[/]+$/, '') + '/m' + messageUid;
+	}
+
+	return result;
+}
