@@ -1,0 +1,131 @@
+.attachmentItem {
+
+	position: relative;
+
+	display: inline-block;
+	margin: 5px;
+	max-width: 200px;
+	min-width: 60px;
+	overflow: hidden;
+	list-style: none;
+	line-height: 24px;
+	border: 0;
+	background-color: rgba(128, 128, 128, 0.1);
+
+	box-shadow: 0 1px 4px #ccc;
+	box-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04), 0 1px 5px rgba(0, 0, 0, 0.1);
+
+	border-radius: 3px;
+
+	&.waiting {
+		opacity: 0.6;
+	}
+
+	&.checked {
+		box-shadow: 0 1px 4px #00a;
+		box-shadow: 0 1px 5px rgba(0, 0, 255, 0.3);
+		box-shadow: 0 0 0 1px rgba(0, 0, 255, 0.1), 0 1px 5px rgba(0, 0, 255, 0.2);
+	}
+
+	.checkboxAttachment {
+		bottom: 6px;
+		cursor: pointer;
+		position: absolute;
+		right: 6px;
+	}
+
+	.attachmentSize {
+		font-size: 12px;
+		opacity: 0.5;
+	}
+
+	&.error {
+		.iconMain, .iconPreview, .attachmentSize, .attachmentName {
+			color: red;
+		}
+	}
+
+	.attachmentIconParent {
+
+		position: absolute;
+		height: 56px;
+		width: 60px;
+		text-align: center;
+
+		.iconPreview, .iconBG, .iconMain, .iconProgress {
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+		}
+
+		.iconProgress {
+			background: #eee;
+			width: 0%;
+		}
+
+		.iconBG {
+			font-size: 18px;
+			font-weight: bold;
+			line-height: 55px;
+			text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+		}
+
+		.iconPreview {
+			display: none;
+		}
+	}
+
+	.attachmentNameParent {
+
+		position: relative;
+
+		margin-left: 60px;
+		padding: 4px 4px 3px 6px;
+		min-width: 90px;
+
+		cursor: pointer;
+
+		border-left: 1px solid #ddd;
+	}
+
+	.iconMain, .iconPreview {
+		box-sizing: border-box;
+		padding: 6px 0 0;
+		font-size: 36px;
+		color: #aaa;
+
+		&.icon-none {
+			display: none;
+		}
+	}
+
+/*
+	.attachmentIconParent.hasPreview.isImage {
+		.iconMain {
+			display: none;
+		}
+	}
+*/
+
+	.showPreview, .showPreplay,
+	.attachmentIconParent.hasPreview:hover .iconMain,
+	.attachmentIconParent.hasPreplay:hover .iconMain,
+	.attachmentIconParent.hasPreview .hidePreview,
+	.attachmentIconParent.hasPreplay .hidePreview {
+		display: none;
+	}
+
+	.attachmentIconParent.hasPreview:hover .iconPreview,
+	.attachmentIconParent.hasPreplay:hover .iconPreview {
+		display: inline-block;
+	}
+
+	.attachmentIconParent.hasPreview .showPreview,
+	.attachmentIconParent.hasPreplay .showPreplay {
+		display: inline;
+		cursor: pointer;
+	}
+}

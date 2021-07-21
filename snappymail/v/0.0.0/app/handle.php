@@ -28,17 +28,12 @@ if (!\defined('RAINLOOP_APP_LIBRARIES_PATH'))
 
 if (\class_exists('RainLoop\Api'))
 {
-	\MailSo\Base\Loader::Init();
-
-	if (!\function_exists('yaml_parse')) {
-		function yaml_parse(string $input) {
-			require_once RAINLOOP_APP_LIBRARIES_PATH.'spyc/Spyc.php';
-			return \Spyc::YAMLLoadString(\str_replace(array(': >-', ': |-', ': |+'), array(': >', ': |', ': |'), $input));
-		}
-		function yaml_parse_file(string $filename) {
-			return yaml_parse(\file_get_contents($filename));
-		}
+	if (!\SnappyMail\HTTP\SecFetch::isEntering() && !\SnappyMail\HTTP\SecFetch::isSameOrigin()) {
+		\MailSo\Base\Http::StatusHeader(403);
+		exit('Disallowed Sec-Fetch-Site: ' . ($_SERVER['HTTP_SEC_FETCH_SITE'] ?? ''));
 	}
+
+	\MailSo\Base\Loader::Init();
 
 	if (!empty($_ENV['RAINLOOP_INCLUDE_AS_API']))
 	{

@@ -16,10 +16,6 @@ export class SecurityAdminSettings {
 			verifySslCertificate: !!SettingsGet('VerifySslCertificate'),
 			allowSelfSigned: !!SettingsGet('AllowSelfSigned'),
 
-			isTwoFactorDropperShown: false,
-			twoFactorDropperUser: '',
-			twoFactorDropperUserFocused: false,
-
 			adminLogin: SettingsGet('AdminLogin'),
 			adminLoginError: false,
 			adminPassword: '',
@@ -30,9 +26,7 @@ export class SecurityAdminSettings {
 			adminPasswordUpdateError: false,
 			adminPasswordUpdateSuccess: false,
 
-			capaOpenPGP: Settings.capa(Capa.OpenPGP),
-			capaTwoFactorAuth: Settings.capa(Capa.TwoFactor),
-			capaTwoFactorAuthForce: Settings.capa(Capa.TwoFactorForce)
+			capaOpenPGP: Settings.capa(Capa.OpenPGP)
 		});
 
 		addSubscribablesTo(this, {
@@ -60,18 +54,6 @@ export class SecurityAdminSettings {
 					CapaOpenPGP: value ? 1 : 0
 				}),
 
-			capaTwoFactorAuth: value => {
-				value || this.capaTwoFactorAuthForce(false);
-				Remote.saveAdminConfig(null, {
-					CapaTwoFactorAuth: value ? 1 : 0
-				});
-			},
-
-			capaTwoFactorAuthForce: value =>
-				Remote.saveAdminConfig(null, {
-					CapaTwoFactorAuthForce: value ? 1 : 0
-				}),
-
 			useLocalProxyForExternalImages: value =>
 				Remote.saveAdminConfig(null, {
 					UseLocalProxyForExternalImages: value ? 1 : 0
@@ -89,8 +71,6 @@ export class SecurityAdminSettings {
 					AllowSelfSigned: value ? 1 : 0
 				})
 		});
-
-		this.onNewAdminPasswordResponse = this.onNewAdminPasswordResponse.bind(this);
 
 		decorateKoCommands(this, {
 			saveNewAdminPasswordCommand: self => self.adminLogin().trim() && self.adminPassword()
@@ -111,7 +91,19 @@ export class SecurityAdminSettings {
 		this.adminPasswordUpdateError(false);
 		this.adminPasswordUpdateSuccess(false);
 
-		Remote.saveNewAdminPassword(this.onNewAdminPasswordResponse, {
+		Remote.saveNewAdminPassword((iError, data) => {
+			if (iError) {
+				this.adminPasswordUpdateError(true);
+			} else {
+				this.adminPassword('');
+				this.adminPasswordNew('');
+				this.adminPasswordNew2('');
+
+				this.adminPasswordUpdateSuccess(true);
+
+				this.weakPassword(!!data.Result.Weak);
+			}
+		}, {
 			'Login': this.adminLogin(),
 			'Password': this.adminPassword(),
 			'NewPassword': this.adminPasswordNew()
@@ -120,36 +112,9 @@ export class SecurityAdminSettings {
 		return true;
 	}
 
-	showTwoFactorDropper() {
-		this.twoFactorDropperUser('');
-		this.isTwoFactorDropperShown(true);
-
-		setTimeout(() => {
-			this.twoFactorDropperUserFocused(true);
-		}, 50);
-	}
-
-	onNewAdminPasswordResponse(iError, data) {
-		if (iError) {
-			this.adminPasswordUpdateError(true);
-		} else {
-			this.adminPassword('');
-			this.adminPasswordNew('');
-			this.adminPasswordNew2('');
-
-			this.adminPasswordUpdateSuccess(true);
-
-			this.weakPassword(!!data.Result.Weak);
-		}
-	}
-
 	onHide() {
 		this.adminPassword('');
 		this.adminPasswordNew('');
 		this.adminPasswordNew2('');
-
-		this.isTwoFactorDropperShown(false);
-		this.twoFactorDropperUser('');
-		this.twoFactorDropperUserFocused(false);
 	}
 }

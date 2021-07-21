@@ -45,6 +45,9 @@ export class MessageModel extends AbstractModel {
 		this.addObservables({
 			subject: '',
 			size: 0,
+			spamScore: 0,
+			spamResult: '',
+			isSpam: false,
 			dateTimeStampInUTC: 0,
 			priority: MessagePriority.Normal,
 
@@ -116,6 +119,9 @@ export class MessageModel extends AbstractModel {
 		this._reset();
 		this.subject('');
 		this.size(0);
+		this.spamScore(0);
+		this.spamResult('');
+		this.isSpam(false);
 		this.dateTimeStampInUTC(0);
 		this.priority(MessagePriority.Normal);
 
@@ -211,10 +217,10 @@ export class MessageModel extends AbstractModel {
 
 	/**
 	 * @param {boolean} friendlyView
-	 * @param {boolean=} wrapWithLink = false
+	 * @param {boolean=} wrapWithLink
 	 * @returns {string}
 	 */
-	fromToLine(friendlyView, wrapWithLink = false) {
+	fromToLine(friendlyView, wrapWithLink) {
 		return this.from.toString(friendlyView, wrapWithLink);
 	}
 
@@ -232,37 +238,37 @@ export class MessageModel extends AbstractModel {
 
 	/**
 	 * @param {boolean} friendlyView
-	 * @param {boolean=} wrapWithLink = false
+	 * @param {boolean=} wrapWithLink
 	 * @returns {string}
 	 */
-	toToLine(friendlyView, wrapWithLink = false) {
+	toToLine(friendlyView, wrapWithLink) {
 		return this.to.toString(friendlyView, wrapWithLink);
 	}
 
 	/**
 	 * @param {boolean} friendlyView
-	 * @param {boolean=} wrapWithLink = false
+	 * @param {boolean=} wrapWithLink
 	 * @returns {string}
 	 */
-	ccToLine(friendlyView, wrapWithLink = false) {
+	ccToLine(friendlyView, wrapWithLink) {
 		return this.cc.toString(friendlyView, wrapWithLink);
 	}
 
 	/**
 	 * @param {boolean} friendlyView
-	 * @param {boolean=} wrapWithLink = false
+	 * @param {boolean=} wrapWithLink
 	 * @returns {string}
 	 */
-	bccToLine(friendlyView, wrapWithLink = false) {
+	bccToLine(friendlyView, wrapWithLink) {
 		return this.bcc.toString(friendlyView, wrapWithLink);
 	}
 
 	/**
 	 * @param {boolean} friendlyView
-	 * @param {boolean=} wrapWithLink = false
+	 * @param {boolean=} wrapWithLink
 	 * @returns {string}
 	 */
-	replyToToLine(friendlyView, wrapWithLink = false) {
+	replyToToLine(friendlyView, wrapWithLink) {
 		return this.replyTo.toString(friendlyView, wrapWithLink);
 	}
 
@@ -318,7 +324,7 @@ export class MessageModel extends AbstractModel {
 	 * @param {boolean=} last = false
 	 * @returns {Array}
 	 */
-	replyEmails(excludeEmails, last = false) {
+	replyEmails(excludeEmails, last) {
 		const result = [],
 			unic = undefined === excludeEmails ? {} : excludeEmails;
 
@@ -339,7 +345,7 @@ export class MessageModel extends AbstractModel {
 	 * @param {boolean=} last = false
 	 * @returns {Array.<Array>}
 	 */
-	replyAllEmails(excludeEmails, last = false) {
+	replyAllEmails(excludeEmails, last) {
 		let data = [];
 		const toResult = [],
 			ccResult = [],
@@ -364,7 +370,7 @@ export class MessageModel extends AbstractModel {
 	/**
 	 * @param {boolean=} print = false
 	 */
-	viewPopupMessage(print = false) {
+	viewPopupMessage(print) {
 		const timeStampInUTC = this.dateTimeStampInUTC() || 0,
 			ccLine = this.ccToLine(false),
 			m = 0 < timeStampInUTC ? new Date(timeStampInUTC * 1000) : null,
@@ -414,6 +420,9 @@ export class MessageModel extends AbstractModel {
 			this.subject(message.subject());
 
 			this.size(message.size());
+			this.spamScore(message.spamScore());
+			this.spamResult(message.spamResult());
+			this.isSpam(message.isSpam());
 			this.dateTimeStampInUTC(message.dateTimeStampInUTC());
 			this.priority(message.priority());
 
@@ -512,13 +521,6 @@ export class MessageModel extends AbstractModel {
 					}
 				}
 			});
-		}
-	}
-
-	storeDataInDom() {
-		if (this.body) {
-			this.body.rlIsHtml = !!this.isHtml();
-			this.body.rlHasImages = !!this.hasImages();
 		}
 	}
 

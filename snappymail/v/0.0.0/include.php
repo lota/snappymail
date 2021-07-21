@@ -2,7 +2,7 @@
 
 	if (defined('APP_VERSION'))
 	{
-		if (!defined('APP_REQUEST_RND'))
+		if (!defined('APP_VERSION_ROOT_PATH'))
 		{
 			if (function_exists('sys_getloadavg')) {
 				$load = sys_getloadavg();
@@ -25,10 +25,7 @@
 			ini_set('register_globals', 0);
 			ini_set('zend.ze1_compatibility_mode', 0);
 
-			define('APP_REQUEST_RND', function_exists('uuid_create') ? md5(uuid_create(UUID_TYPE_DEFAULT)) : bin2hex(random_bytes(16)));
 			define('APP_VERSION_ROOT_PATH', APP_INDEX_ROOT_PATH.'snappymail/v/'.APP_VERSION.'/');
-
-			define('APP_USE_APC_CACHE', true);
 
 			// "img-src https:" is allowed due to remote images in e-mails
 			define('APP_DEFAULT_CSP', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: https: http:; style-src 'self' 'unsafe-inline'");
@@ -37,18 +34,14 @@
 
 			$sSite = strtolower(trim(empty($_SERVER['HTTP_HOST']) ? (empty($_SERVER['SERVER_NAME']) ? '' : $_SERVER['SERVER_NAME']) : $_SERVER['HTTP_HOST']));
 			$sSite = 'www.' === substr($sSite, 0, 4) ? substr($sSite, 4) : $sSite;
-			$sSite = preg_replace('/^.+@/', '', preg_replace('/:[\d]+$/', '', $sSite));
-			$sSite = in_array($sSite, array('localhost', '127.0.0.1', '::1', '::1/128', '0:0:0:0:0:0:0:1')) ? 'localhost' : trim($sSite);
-			$sSite = 0 === strlen($sSite) ? 'localhost' : $sSite;
+			$sSite = trim(preg_replace('/^.+@/', '', preg_replace('/:[\d]+$/', '', $sSite)));
+			$sSite = in_array($sSite, array('', 'localhost', '127.0.0.1', '::1', '::1/128', '0:0:0:0:0:0:0:1')) ? 'localhost' : $sSite;
 
 			define('APP_SITE', $sSite);
 			unset($sSite);
 
-			define('APP_DEFAULT_PRIVATE_DATA_NAME', '_default_');
-
 			$sPrivateDataFolderInternalName = defined('MULTIDOMAIN') ? APP_SITE : '';
-			define('APP_PRIVATE_DATA_NAME', 0 === strlen($sPrivateDataFolderInternalName) ? APP_DEFAULT_PRIVATE_DATA_NAME : $sPrivateDataFolderInternalName);
-			define('APP_MULTIPLY', 0 < strlen($sPrivateDataFolderInternalName) && APP_DEFAULT_PRIVATE_DATA_NAME !== APP_PRIVATE_DATA_NAME);
+			define('APP_PRIVATE_DATA_NAME', 0 === strlen($sPrivateDataFolderInternalName) ? '_default_' : $sPrivateDataFolderInternalName);
 
 			define('APP_DUMMY', '********');
 			define('APP_DEV_VERSION', '0.0.0');
@@ -60,6 +53,8 @@
 			{
 				include_once APP_INDEX_ROOT_PATH.'include.php';
 			}
+
+			defined('APP_USE_APCU_CACHE') || define('APP_USE_APCU_CACHE', true);
 
 			$sCustomDataPath = function_exists('__get_custom_data_full_path') ? rtrim(trim(__get_custom_data_full_path()), '\\/') : $sCustomDataPath;
 			define('APP_DATA_FOLDER_PATH', 0 === strlen($sCustomDataPath) ? APP_INDEX_ROOT_PATH.'data/' : $sCustomDataPath.'/');
@@ -142,7 +137,7 @@
 
 			define('APP_PLUGINS_PATH', APP_PRIVATE_DATA.'plugins/');
 
-			if (APP_VERSION !== $sInstalled || (APP_MULTIPLY && !is_dir(APP_PRIVATE_DATA)))
+			if (APP_VERSION !== $sInstalled || (!is_dir(APP_PRIVATE_DATA) && strlen($sPrivateDataFolderInternalName) && '_default_' !== APP_PRIVATE_DATA_NAME))
 			{
 				define('APP_INSTALLED_START', true);
 				define('APP_INSTALLED_VERSION', $sInstalled);
@@ -239,8 +234,19 @@
 		}
 
 		// See https://github.com/kjdev/php-ext-brotli
-		if (defined('USE_GZIP') && !ini_get('zlib.output_compression') && !ini_get('brotli.output_compression')) {
-			ob_start('ob_gzhandler');
+		if (!ini_get('zlib.output_compression') && !ini_get('brotli.output_compression')) {
+			if (defined('USE_GZIP')) {
+				ob_start('ob_gzhandler');
+			} else if (defined('USE_BROTLI') && is_callable('brotli_compress_add') && false !== stripos($_SERVER['HTTP_ACCEPT_ENCODING'], 'br')) {
+				ob_start(function(string $buffer, int $phase){
+					static $resource;
+					if ($phase & PHP_OUTPUT_HANDLER_START) {
+						header('Content-Encoding: br');
+						$resource = brotli_compress_init(/*int $quality = 11, int $mode = BROTLI_GENERIC*/);
+					}
+					return brotli_compress_add($resource, $buffer, ($phase & PHP_OUTPUT_HANDLER_FINAL) ? BROTLI_FINISH : BROTLI_PROCESS);
+				});
+			}
 		}
 
 		include APP_VERSION_ROOT_PATH.'app/handle.php';

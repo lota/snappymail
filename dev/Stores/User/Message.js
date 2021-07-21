@@ -2,7 +2,7 @@ import ko from 'ko';
 
 import { Scope, Notification } from 'Common/Enums';
 import { MessageSetAction } from 'Common/EnumsUser';
-import { doc, createElement, elementById } from 'Common/Globals';
+import { doc, $htmlCL, createElement, elementById } from 'Common/Globals';
 import { isNonEmptyArray, pInt, pString, addObservablesTo, addSubscribablesTo } from 'Common/Utils';
 import { plainToHtml } from 'Common/UtilsUser';
 
@@ -186,6 +186,8 @@ export const MessageUserStore = new class {
 				}
 			},
 
+			listLoadingAnimation: value => $htmlCL.toggle('list-loading', value),
+
 			listLoading: value =>
 				this.listCompleteLoading(value || this.listIsNotCompleted()),
 
@@ -220,9 +222,7 @@ export const MessageUserStore = new class {
 			}
 		});
 
-		this.onMessageResponse = this.onMessageResponse.bind(this);
-
-		this.purgeMessageBodyCacheThrottle = this.purgeMessageBodyCache.throttle(30000);
+		this.purgeMessageBodyCache = this.purgeMessageBodyCache.throttle(30000);
 	}
 
 	purgeMessageBodyCache() {
@@ -430,17 +430,12 @@ export const MessageUserStore = new class {
 		);
 	}
 
-	setMessage(data, cached) {
+	setMessage(data, cached, oMessage) {
 		let isNew = false,
-			body = null,
 			json = data && data.Result,
-			id = '',
-			plain = '',
-			resultHtml = '',
-			pgpSigned = false,
 			messagesDom = this.messagesBodiesDom(),
 			selectedMessage = this.selectorMessageSelected(),
-			message = this.message();
+			message = oMessage || this.message();
 
 		if (
 			json &&
@@ -450,7 +445,7 @@ export const MessageUserStore = new class {
 		) {
 			const threads = message.threads();
 			if (message.uid !== json.Uid && 1 < threads.length && threads.includes(json.Uid)) {
-				message = MessageModel.reviveFromJson(json);
+				message = oMessage ? null : MessageModel.reviveFromJson(json);
 				if (message) {
 					message.threads(threads);
 					MessageFlagsCache.initMessage(message);
@@ -463,7 +458,7 @@ export const MessageUserStore = new class {
 			}
 
 			if (message && message.uid === json.Uid) {
-				this.messageError('');
+				oMessage || this.messageError('');
 
 				if (cached) {
 					delete json.IsSeen;
@@ -478,7 +473,8 @@ export const MessageUserStore = new class {
 				addRequestedMessage(message.folder, message.uid);
 
 				if (messagesDom) {
-					id = 'rl-mgs-' + message.hash.replace(/[^a-zA-Z0-9]/g, '');
+					let body = null,
+						id = 'rl-mgs-' + message.hash.replace(/[^a-zA-Z0-9]/g, '');
 
 					const textBody = elementById(id);
 					if (textBody) {
@@ -486,7 +482,9 @@ export const MessageUserStore = new class {
 						message.fetchDataFromDom();
 						messagesDom.append(textBody);
 					} else {
-						let isHtml = !!json.Html;
+						let isHtml = !!json.Html,
+							plain = '',
+							resultHtml = '<pre></pre>';
 						if (isHtml) {
 							resultHtml = json.Html.toString();
 							if (SettingsUserStore.removeColors()) {
@@ -497,32 +495,20 @@ export const MessageUserStore = new class {
 
 							if ((message.isPgpSigned() || message.isPgpEncrypted()) && PgpUserStore.capaOpenPGP()) {
 								plain = pString(json.Plain);
-
-								const isPgpEncrypted = /---BEGIN PGP MESSAGE---/.test(plain);
-								if (!isPgpEncrypted) {
-									pgpSigned =
-										/-----BEGIN PGP SIGNED MESSAGE-----/.test(plain) && /-----BEGIN PGP SIGNATURE-----/.test(plain);
-								}
-
 								const pre = createElement('pre');
-								if (pgpSigned && message.isPgpSigned()) {
+								if (message.isPgpSigned()) {
 									pre.className = 'b-plain-openpgp signed';
 									pre.textContent = plain;
-								} else if (isPgpEncrypted && message.isPgpEncrypted()) {
+								} else if (message.isPgpEncrypted()) {
 									pre.className = 'b-plain-openpgp encrypted';
 									pre.textContent = plain;
 								} else {
 									pre.innerHTML = resultHtml;
 								}
 								resultHtml = pre.outerHTML;
-
-								message.isPgpSigned(pgpSigned);
-								message.isPgpEncrypted(isPgpEncrypted);
 							} else {
 								resultHtml = '<pre>' + resultHtml + '</pre>';
 							}
-						} else {
-							resultHtml = '<pre>' + resultHtml + '</pre>';
 						}
 
 						body = Element.fromHTML('<div id="' + id + '" hidden="" class="b-text-part '
@@ -530,21 +516,24 @@ export const MessageUserStore = new class {
 							+ findEmailAndLinks(resultHtml)
 							+ '</div>');
 
-						// Drop Microsoft Office style properties
-						const rgbRE = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/g,
-							hex = n => ('0' + parseInt(n).toString(16)).slice(-2);
-						body.querySelectorAll('[style*=mso]').forEach(el =>
-							el.setAttribute('style', el.style.cssText.replace(rgbRE, (m,r,g,b) => '#' + hex(r) + hex(g) + hex(b)))
-						);
+						if (isHtml) {
+							// Drop Microsoft Office style properties
+							const rgbRE = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/g,
+								hex = n => ('0' + parseInt(n).toString(16)).slice(-2);
+							body.querySelectorAll('[style*=mso]').forEach(el =>
+								el.setAttribute('style', el.style.cssText.replace(rgbRE, (m,r,g,b) => '#' + hex(r) + hex(g) + hex(b)))
+							);
+						}
+
+						body.rlIsHtml = isHtml;
+						body.rlHasImages = !!json.HasExternals;
 
 						message.body = body;
 
 						message.isHtml(isHtml);
-						message.hasImages(!!json.HasExternals);
+						message.hasImages(body.rlHasImages);
 
 						messagesDom.append(body);
-
-						message.storeDataInDom();
 
 						if (json.HasInternals) {
 							message.showInternalImages();
@@ -554,12 +543,12 @@ export const MessageUserStore = new class {
 							message.showExternalImages();
 						}
 
-						this.purgeMessageBodyCacheThrottle();
+						this.purgeMessageBodyCache();
 					}
 
-					this.messageActiveDom(message.body);
+					oMessage || this.messageActiveDom(message.body);
 
-					this.hideMessageBodies();
+					oMessage || this.hideMessageBodies();
 
 					if (body) {
 						this.initOpenPgpControls(body, message);
@@ -567,7 +556,8 @@ export const MessageUserStore = new class {
 						this.initBlockquoteSwitcher(body);
 					}
 
-					message.body.hidden = false;
+					oMessage || (message.body.hidden = false);
+					oMessage && message.viewPopupMessage();
 				}
 
 				MessageFlagsCache.initMessage(message);
@@ -576,8 +566,6 @@ export const MessageUserStore = new class {
 				}
 
 				if (isNew) {
-					message = this.message();
-
 					if (
 						selectedMessage &&
 						message &&
@@ -628,29 +616,22 @@ export const MessageUserStore = new class {
 		}
 	}
 
-	populateMessageBody(oMessage) {
+	populateMessageBody(oMessage, preload) {
 		if (oMessage) {
-			this.hideMessageBodies();
-			this.messageLoading(true);
-			Remote.message(this.onMessageResponse, oMessage.folder, oMessage.uid);
+			preload || this.hideMessageBodies();
+			preload || this.messageLoading(true);
+			Remote.message((iError, oData, bCached) => {
+				if (iError) {
+					if (Notification.RequestAborted !== iError && !preload) {
+						this.message(null);
+						this.messageError(getNotification(iError));
+					}
+				} else {
+					this.setMessage(oData, bCached, preload ? oMessage : null);
+				}
+				preload || this.messageLoading(false);
+			}, oMessage.folder, oMessage.uid);
 		}
-	}
-
-	/**
-	 * @param {string} sResult
-	 * @param {FetchJsonDefaultResponse} oData
-	 * @param {boolean} bCached
-	 */
-	onMessageResponse(iError, oData, bCached) {
-		if (iError) {
-			if (Notification.RequestAborted !== iError) {
-				this.message(null);
-				this.messageError(getNotification(iError));
-			}
-		} else {
-			this.setMessage(oData, bCached);
-		}
-		this.messageLoading(false);
 	}
 
 	/**

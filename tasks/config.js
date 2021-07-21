@@ -50,8 +50,7 @@ config.paths.css = {
 	boot: {
 		name: 'boot.css',
 		src: [
-			'dev/Styles/@Boot.css',
-			'dev/Styles/_progressjs.css'
+			'dev/Styles/@Boot.css'
 		]
 	}
 };
@@ -68,7 +67,6 @@ config.paths.js = {
 			'vendors/routes/hasher.js',
 			'vendors/routes/crossroads.js',
 			'vendors/jua/jua.js',
-			'vendors/qr.js/qr.min.js',
 			'vendors/bootstrap/js/bootstrap.native.js',
 			'vendors/knockout/build/output/knockout-latest.js',
 			'vendors/squire/build/squire-raw.js',

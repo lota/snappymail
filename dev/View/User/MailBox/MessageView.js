@@ -133,6 +133,8 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 			viewReplyTo: '',
 			viewTimeStamp: 0,
 			viewSize: '',
+			viewSpamScore: 0,
+			viewSpamStatus: '',
 			viewLineAsCss: '',
 			viewViewLink: '',
 			viewUnsubscribeLink: '',
@@ -217,13 +219,15 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 					this.viewFromShort(message.fromToLine(true, true));
 					this.viewFromDkimData(message.fromDkimData());
 					this.viewToShort(message.toToLine(true, true));
-					this.viewFrom(message.fromToLine(false));
-					this.viewTo(message.toToLine(false));
-					this.viewCc(message.ccToLine(false));
-					this.viewBcc(message.bccToLine(false));
-					this.viewReplyTo(message.replyToToLine(false));
+					this.viewFrom(message.fromToLine());
+					this.viewTo(message.toToLine());
+					this.viewCc(message.ccToLine());
+					this.viewBcc(message.bccToLine());
+					this.viewReplyTo(message.replyToToLine());
 					this.viewTimeStamp(message.dateTimeStampInUTC());
 					this.viewSize(message.friendlySize());
+					this.viewSpamScore(message.spamScore());
+					this.viewSpamStatus(i18n(message.isSpam() ? 'GLOBAL/SPAM' : 'GLOBAL/NOT_SPAM') + ': ' + message.spamResult());
 					this.viewLineAsCss(message.lineAsCss());
 					this.viewViewLink(message.viewLink());
 					this.viewUnsubscribeLink(message.getFirstUnsubsribeLink());
@@ -258,8 +262,6 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 		this.lastReplyAction(Local.get(ClientSideKeyName.LastReplyAction) || ComposeType.Reply);
 
 		addEventListener('mailbox.message-view.toggle-full-screen', () => this.toggleFullScreen());
-
-		this.attachmentPreview = this.attachmentPreview.bind(this);
 
 		decorateKoCommands(this, {
 			closeMessageCommand: 1,
@@ -307,57 +309,6 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 
 	checkHeaderHeight() {
 		this.oHeaderDom && this.viewBodyTopValue(this.message() ? this.oHeaderDom.offsetHeight : 0);
-	}
-
-	//  displayMailToPopup(sMailToUrl) {
-	//		sMailToUrl = sMailToUrl.replace(/\?.+$/, '');
-	//
-	//		var
-	//			sResult = '',
-	//			aTo = [],
-	//			EmailModel = require('Model/Email').default,
-	//			fParseEmailLine = function(sLine) {
-	//				return sLine ? [decodeURIComponent(sLine)].map(sItem => {
-	//						var oEmailModel = new EmailModel();
-	//						oEmailModel.parse(sItem);
-	//						return oEmailModel.email ? oEmailModel : null;
-	//					}).filter(v => v) : null;
-	//			}
-	//		;
-	//
-	//		aTo = fParseEmailLine(sMailToUrl);
-	//		sResult = aTo && aTo[0] ? aTo[0].email : '';
-	//
-	//		return sResult;
-	//	}
-
-	/**
-	 * @param {Object} oAttachment
-	 * @returns {boolean}
-	 */
-	attachmentPreview(/*attachment*/) {
-/*
-		if (attachment && attachment.isImage() && !attachment.isLinked && this.message() && this.message().attachments()) {
-			const items = this.message().attachments.map(item => {
-					if (item && !item.isLinked && item.isImage()) {
-						if (item === attachment) {
-							index = listIndex;
-						}
-						++listIndex;
-						return {
-							src: item.linkPreview(),
-							msrc: item.linkThumbnail(),
-							title: item.fileName
-						};
-					}
-					return null;
-				}).filter(v => v);
-
-			if (items.length) {
-			}
-		}
-*/
-		return true;
 	}
 
 	onBuild(dom) {
@@ -472,33 +423,28 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 		this.initShortcuts();
 	}
 
-	/**
-	 * @returns {boolean}
-	 */
-	escShortcuts() {
-		if (this.viewModelVisible && this.message()) {
-			const preview = SettingsUserStore.usePreviewPane();
-			if (this.fullScreenMode()) {
-				this.fullScreenMode(false);
-
-				if (preview) {
-					AppUserStore.focusedState(Scope.MessageList);
-				}
-			} else if (!preview) {
-				this.message(null);
-			} else {
-				AppUserStore.focusedState(Scope.MessageList);
-			}
-
-			return false;
-		}
-
-		return true;
-	}
-
 	initShortcuts() {
 		// exit fullscreen, back
-		shortcuts.add('escape,backspace', '', Scope.MessageView, this.escShortcuts.bind(this));
+		shortcuts.add('escape,backspace', '', Scope.MessageView, () => {
+			if (this.viewModelVisible && this.message()) {
+				const preview = SettingsUserStore.usePreviewPane();
+				if (this.fullScreenMode()) {
+					this.fullScreenMode(false);
+
+					if (preview) {
+						AppUserStore.focusedState(Scope.MessageList);
+					}
+				} else if (!preview) {
+					this.message(null);
+				} else {
+					AppUserStore.focusedState(Scope.MessageList);
+				}
+
+				return false;
+			}
+
+			return true;
+		});
 
 		// fullscreen
 		shortcuts.add('enter,open', '', Scope.MessageView, () => {

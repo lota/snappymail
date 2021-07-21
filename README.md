@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/the-djmaze/snappymail">
-    <img width="200" heigth="200" src="https://snappymail.eu/static/img/logo-256x256.png">
+    <img src="https://snappymail.eu/static/img/logo-256x256.png">
   </a>
   <br>
   <h1>SnappyMail</h1>
@@ -71,6 +71,10 @@ This fork of RainLoop has the following changes:
 * Replaced webpack with rollup
 * No user-agent detection (use device width)
 * Added support to load plugins as .phar
+* Replaced old Sabre library
+* AddressBook Contacts support MySQL/MariaDB utf8mb4
+* Prevent Google FLoC
+* Added [Fetch Metadata Request Headers](https://www.w3.org/TR/fetch-metadata/) checks
 
 ### Removal of old JavaScript
 
@@ -116,25 +120,30 @@ RainLoop 1.15 vs SnappyMail
 
 |js/*           	|RainLoop 	|Snappy   	|
 |---------------	|--------:	|--------:	|
-|admin.js        	|2.158.025	|  100.721	|
-|app.js          	|4.215.733	|  497.330	|
-|boot.js         	|  672.433	|    4.726	|
-|libs.js         	|  647.679	|  227.974	|
+|admin.js        	|2.158.025	|   91.364	|
+|app.js          	|4.215.733	|  454.661	|
+|boot.js         	|  672.433	|    3.147	|
+|libs.js         	|  647.679	|  218.491	|
 |polyfills.js    	|  325.908	|        0	|
 |serviceworker.js	|        0	|      285	|
-|TOTAL           	|8.019.778	|  830.864	|
+|TOTAL           	|8.019.778	|  767.663	|
 
 |js/min/*       	|RainLoop 	|Snappy   	|RL gzip	|SM gzip	|RL brotli	|SM brotli	|
 |---------------	|--------:	|--------:	|------:	|------:	|--------:	|--------:	|
-|admin.min.js    	|  255.514	|   50.607	| 73.899	| 14.944	| 60.674 	| 13.364	|
-|app.min.js      	|  516.000	|  241.496	|140.430	| 70.637	|110.657 	| 59.605	|
-|boot.min.js     	|   66.456	|    2.442	| 22.553	|  1.371	| 20.043 	|  1.178	|
-|libs.min.js     	|  574.626	|  115.877	|177.280	| 42.809	|151.855 	| 38.099	|
-|polyfills.min.js	|   32.608	|        0	| 11.315	|      0	| 10.072 	|      0	|
-|TOTAL           	|1.445.204	|  410.422	|425.477	|129.761	|353.301 	|112.246	|
-|TOTAL (no admin)	|1.189.690	|  359.815	|351.061	|114.817	|292.627 	| 98.882	|
+|admin.min.js    	|  255.514	|   47.527	| 73.899	| 14.263	| 60.674  	| 12.750	|
+|app.min.js      	|  516.000	|  233.755	|140.430	| 68.663	|110.657  	| 58.026	|
+|boot.min.js     	|   66.456	|    1.751	| 22.553	|  1.025	| 20.043  	|    858	|
+|libs.min.js     	|  574.626	|  106.543	|177.280	| 38.613	|151.855  	| 34.543	|
+|polyfills.min.js	|   32.608	|        0	| 11.315	|      0	| 10.072  	|      0	|
+|TOTAL           	|1.445.204	|  389.576	|425.477	|122.564	|353.301  	|106.177	|
+|TOTAL (no admin)	|1.189.690	|  342.049	|351.061	|108.301	|292.627  	| 93.427	|
 
-For a user its around 66% smaller and faster than traditional RainLoop.
+For a user its around 69% smaller and faster than traditional RainLoop.
+
+|OpenPGP        	|RainLoop 	|Snappy   	|RL gzip	|SM gzip	|RL brotli	|SM brotli	|
+|---------------	|--------:	|--------:	|------:	|------:	|--------:	|--------:	|
+|openpgp.min.js 	|  330.742	|  293.972	|102.388	| 93.030	| 84.241  	| 77.142	|
+|openpgp.worker 	|    1.499	|    1.125	|    824	|    567	|    695 	|    467	|
 
 ### CSS changes
 
@@ -165,13 +174,13 @@ For a user its around 66% smaller and faster than traditional RainLoop.
 
 
 |css/*       	|RainLoop	|Snappy   	|RL gzip	|SM gzip	|SM brotli	|
-|------------	|-------:	|-------:	|------:	|------:	|--------:	|
-|app.css     	| 340.334	| 107.471	| 46,959	| 18.828	| 16.184	|
-|app.min.css 	| 274.791	|  88.601	| 39.618	| 16.867	| 14.861	|
-|boot.css    	|       	|   2.066	|       	|    913	|    742	|
-|boot.min.css	|       	|   1.696	|       	|    818	|    664	|
-|admin.css    	|       	|  46.393	|       	|  9.237	|  8.073	|
-|admin.min.css	|       	|  37.306	|       	|  8.191	|  7.282	|
+|------------	|-------:	|------:	|------:	|------:	|--------:	|
+|app.css     	| 340.334	| 98.499	| 46,959	| 17.842	| 15.378	|
+|app.min.css 	| 274.791	| 81.603	| 39.618	| 15.982	| 14.056	|
+|boot.css    	|       	|  1.326	|       	|    664	|    545	|
+|boot.min.css	|       	|  1.071	|       	|    590	|    474	|
+|admin.css    	|       	| 40.516	|       	|  8.481	|  7.401	|
+|admin.min.css	|       	| 32.041	|       	|  7.447	|  6.610	|
 
 
 ### Squire vs CKEditor

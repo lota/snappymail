@@ -1,7 +1,7 @@
 /* RainLoop Webmail (c) RainLoop Team | Licensed under AGPL 3 */
 const gulp = require('gulp');
 
-const concat = require('gulp-concat-util'),
+const concat = require('gulp-concat'),
 	header = require('gulp-header'),
 	rename = require('gulp-rename'),
 	replace = require('gulp-replace'),
@@ -37,14 +37,14 @@ const jsServiceWorker = () => {
 // OpenPGP
 const jsOpenPGP = () => {
 	return gulp
-		.src('node_modules/openpgp/dist/openpgp.min.js')
-		.pipe(gulp.dest(config.paths.staticMinJS));
+		.src('vendors/openpgp-2.6.2/dist/openpgp.js')
+		.pipe(gulp.dest(config.paths.staticJS));
 };
 
 // OpenPGP Worker
 const jsOpenPGPWorker = () => {
 	return gulp
-		.src('node_modules/openpgp/dist/openpgp.worker.min.js')
+		.src('vendors/openpgp-2.6.2/dist/openpgp.worker.min.js')
 		.pipe(gulp.dest(config.paths.staticMinJS));
 };
 

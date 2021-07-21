@@ -106,6 +106,15 @@ class Application extends \RainLoop\Config\AbstractConfig
 
 	protected function defaultValues() : array
 	{
+		$value = \ini_get('upload_max_filesize');
+		$upload_max_filesize = \intval($value);
+		switch (\strtoupper(\substr($value, -1))) {
+			case 'G': $upload_max_filesize *= 1024;
+			case 'M': $upload_max_filesize *= 1024;
+			case 'K': $upload_max_filesize *= 1024;
+		}
+		$upload_max_filesize = $upload_max_filesize / 1024 / 1024;
+
 		return array(
 
 			'webmail' => array(
@@ -127,7 +136,7 @@ class Application extends \RainLoop\Config\AbstractConfig
 
 				'messages_per_page'           => array(20, 'Number of messages displayed on page by default'),
 
-				'attachment_size_limit'       => array(25, 'File size limit (MB) for file upload on compose screen
+				'attachment_size_limit'       => array(\min($upload_max_filesize, 25), 'File size limit (MB) for file upload on compose screen
 0 for unlimited.')
 			),
 
@@ -141,7 +150,7 @@ class Application extends \RainLoop\Config\AbstractConfig
 				'allow_sync'        => array(false),
 				'sync_interval'     => array(20),
 				'type'              => array('sqlite', ''),
-				'pdo_dsn'           => array('mysql:host=127.0.0.1;port=3306;dbname=rainloop', ''),
+				'pdo_dsn'           => array('host=127.0.0.1;port=3306;dbname=snappymail', ''),
 				'pdo_user'          => array('root', ''),
 				'pdo_password'      => array('', ''),
 				'suggestions_limit' => array(30)
@@ -158,10 +167,8 @@ class Application extends \RainLoop\Config\AbstractConfig
 				'openpgp'                    => array(false),
 
 				'admin_login'                => array('admin', 'Login and password for web admin panel'),
-				'admin_password'             => array(\password_hash('12345', PASSWORD_DEFAULT)),
+				'admin_password'             => array(''),
 				'allow_admin_panel'          => array(true, 'Access settings'),
-				'allow_two_factor_auth'      => array(false),
-				'force_two_factor_auth'      => array(false),
 				'hide_x_mailer_header'       => array(true),
 				'admin_panel_host'           => array(''),
 				'admin_panel_key'            => array('admin'),
@@ -203,9 +210,6 @@ class Application extends \RainLoop\Config\AbstractConfig
 				'determine_user_domain' => array(false, ''),
 
 				'hide_submit_button' => array(true),
-
-				'forgot_password_link_url' => array('', ''),
-				'registration_link_url' => array('', ''),
 
 				'login_lowercase' => array(true, ''),
 
@@ -373,6 +377,7 @@ Enables caching in the system'),
 				'replace_env_in_configuration' => array(''),
 				'startup_url' => array(''),
 				'strict_html_parser' => array(false),
+				'boundary_prefix' => array(''),
 				'dev_email' => array(''),
 				'dev_password' => array('')
 			),

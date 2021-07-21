@@ -1,0 +1,152 @@
+
+#top-system-dropdown-id {
+	overflow: hidden;
+	padding-left: 10px;
+	padding-right: 10px;
+}
+
+.rl-left-panel-disabled #more-list-dropdown-id + .dropdown-menu {
+	position: fixed;
+	top: 40px;
+}
+
+.b-system-drop-down {
+
+	.b-toolbar {
+		position: absolute;
+		top: 0;
+		right: 0;
+		height: 30px;
+		padding: 10px @rlLowMargin;
+		z-index: 103;
+	}
+
+	.email-title {
+		display: inline-block;
+		max-width: 50vw;
+		text-align: left;
+		text-overflow: ellipsis;
+		overflow: hidden;
+		margin-right: 28px;
+		vertical-align: middle;
+	}
+
+	.audioPlace {
+		display: inline-block;
+		font-size: 30px;
+		height: 30px;
+		margin-right: 10px;
+		width: 1em;
+
+		.playIcon, .stopIcon {
+			cursor: pointer;
+			color: orange;
+			text-shadow: 0 1px 0 #555;
+		}
+
+		.stopIcon {
+			display: none;
+		}
+
+		&:hover {
+
+			.playIcon {
+				display: none;
+			}
+
+			.stopIcon {
+				display: inline-block;
+			}
+		}
+	}
+
+	.accountPlace {
+		background-color: rgba(0, 0, 0, 0.5);
+		border-radius: 4px;
+		color: #fff;
+		display: inline-block;
+		font-weight: bold;
+		font-size: 16px;
+		height: 29px;
+		line-height: 30px;
+		max-width: 25vw;
+		overflow: hidden;
+		padding: 1px 8px;
+		text-overflow: ellipsis;
+		text-shadow: 0 1px 0 #000;
+		white-space: nowrap;
+	}
+
+	.account-item {
+		&:not(.current) i:first-child,
+		&.current i + i {
+			display: none;
+		}
+	}
+
+	.counter {
+		display: inline-block;
+	}
+
+	.g-ui-menu .e-link.account-item {
+		padding-right: 5px;
+	}
+}
+
+@keyframes firstBar {
+  0%   { height: 30%; }
+  50%  { height: 100%; }
+  100% { height: 30%; }
+}
+
+@keyframes secondBar {
+  0%   { height: 90%; }
+  50%  { height: 30%; }
+  100% { height: 100%; }
+}
+
+@keyframes thirdBar {
+  0%   { height: 20%; }
+  40%  { height: 40%; }
+  60%  { height: 80%; }
+  100% { height: 40%; }
+}
+
+.equaliser {
+
+	margin-top: 5px;
+	width: 30px;
+	height: 20px;
+	position: relative;
+
+	.bar {
+		width: 5px;
+		height: 5px;
+		background: orange;
+		position: absolute;
+		bottom:0;
+		animation: none;
+	}
+
+	.first {
+		left: calc(1em / 2 - 10px);
+	}
+	.second {
+		left: calc(1em / 2 - 2px);
+	}
+	.third {
+		left: calc(1em / 2 + 6px);
+	}
+
+	&.animated {
+		.first {
+			animation: firstBar 1s infinite;
+		}
+		.second {
+			animation: secondBar 1s infinite;
+		}
+		.third {
+			animation: thirdBar 1s infinite;
+		}
+	}
+}

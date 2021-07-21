@@ -161,13 +161,13 @@ class ImapClient extends \MailSo\Net\NetClient
 		$this->sLogginedUser = $sLogin;
 
 //		$encrypted = !empty(\stream_get_meta_data($this->rConnect)['crypto']);
-		$type = '';
+		$type = $this->IsSupported('LOGINDISABLED') ? '' : 'LOGIN'; // RFC3501 6.2.3
 		$types = [
 //			'SCRAM-SHA-256' => 1, // !$encrypted
 //			'SCRAM-SHA-1' => 1, // !$encrypted
 			'CRAM-MD5' => $bUseAuthCramMd5IfSupported,
 			'PLAIN' => $bUseAuthPlainIfSupported,
-			'LOGIN' => 1 // $encrypted
+			'LOGIN' => 1,
 		];
 		foreach ($types as $sasl_type => $active) {
 			if ($active && $this->IsSupported("AUTH={$sasl_type}") && \SnappyMail\SASL::isSupported($sasl_type)) {
@@ -181,59 +181,54 @@ class ImapClient extends \MailSo\Net\NetClient
 
 		try
 		{
-			if ('CRAM-MD5' === $type)
+			if (0 === \strpos($type, 'SCRAM-SHA-'))
 			{
-				$oContinuationResponse = $this->SendRequestGetResponse('AUTHENTICATE', array($type))->getLast();
-				if ($oContinuationResponse && Enumerations\ResponseType::CONTINUATION === $oContinuationResponse->ResponseType)
-				{
-					$sTicket = $oContinuationResponse->ResponseList[1] ?? null;
-					if ($sTicket)
-					{
-						$sToken = $SASL->authenticate($sLogin, $sPassword, $sTicket);
-
-						$sTicket = \base64_decode($sTicket);
-						$this->oLogger->Write('ticket: '.$sTicket);
-
-						if ($this->oLogger)
-						{
-							$this->oLogger->AddSecret($sToken);
-						}
-
-						$this->sendRaw($sToken, true, '*******');
-						$this->getResponse();
-					}
-					else
-					{
-						$this->writeLogException(
-							new Exceptions\LoginException,
-							\MailSo\Log\Enumerations\Type::NOTICE, true);
-					}
+				$sAuthzid = $this->getResponseValue($this->SendRequestGetResponse('AUTHENTICATE', array($type)), Enumerations\ResponseType::CONTINUATION);
+				$this->sendRaw($SASL->authenticate($sLogin, $sPassword/*, $sAuthzid*/), true);
+				$sChallenge = $SASL->challenge($this->getResponseValue($this->getResponse(), Enumerations\ResponseType::CONTINUATION));
+				if ($this->oLogger) {
+					$this->oLogger->AddSecret($sChallenge);
 				}
-				else
-				{
-					$this->writeLogException(
-						new Exceptions\LoginException,
-						\MailSo\Log\Enumerations\Type::NOTICE, true);
+				$this->sendRaw($sChallenge, true, '*******');
+				$sSignature = $this->getResponseValue($this->getResponse());
+				$SASL->verify($sSignature);
+			}
+			else if ('CRAM-MD5' === $type)
+			{
+				$sChallenge = $this->getResponseValue($this->SendRequestGetResponse('AUTHENTICATE', array($type)), Enumerations\ResponseType::CONTINUATION);
+				$this->oLogger->Write('challenge: '.\base64_decode($sChallenge));
+				$sAuth = $SASL->authenticate($sLogin, $sPassword, $sChallenge);
+				if ($this->oLogger) {
+					$this->oLogger->AddSecret($sAuth);
 				}
+				$this->sendRaw($sAuth, true, '*******');
+				$this->getResponse();
 			}
 			else if ('PLAIN' === $type)
 			{
-				$sToken = $SASL->authenticate($sLogin, $sPassword);
-				if ($this->oLogger)
-				{
-					$this->oLogger->AddSecret($sToken);
+				$sAuth = $SASL->authenticate($sLogin, $sPassword);
+				if ($this->oLogger) {
+					$this->oLogger->AddSecret($sAuth);
 				}
-
-				if ($this->IsSupported('AUTH=SASL-IR') && false)
-				{
-					$this->SendRequestGetResponse('AUTHENTICATE', array('PLAIN', $sToken));
-				}
-				else
-				{
-					$this->SendRequestGetResponse('AUTHENTICATE', array('PLAIN'));
-					$this->sendRaw($sToken, true, '*******');
+				if ($this->IsSupported('SASL-IR')) {
+					$this->SendRequestGetResponse('AUTHENTICATE', array($type, $sAuth));
+				} else {
+					$this->SendRequestGetResponse('AUTHENTICATE', array($type));
+					$this->sendRaw($sAuth, true, '*******');
 					$this->getResponse();
 				}
+			}
+			else if ($this->IsSupported('LOGINDISABLED'))
+			{
+				$sB64 = $this->getResponseValue($this->SendRequestGetResponse('AUTHENTICATE', array($type)), Enumerations\ResponseType::CONTINUATION);
+				$this->sendRaw($SASL->authenticate($sLogin, $sPassword, $sB64), true);
+				$this->getResponse();
+				$sPass = $SASL->challenge(''/*UGFzc3dvcmQ6*/);
+				if ($this->oLogger) {
+					$this->oLogger->AddSecret($sPass);
+				}
+				$this->sendRaw($sPass, true, '*******');
+				$this->getResponse();
 			}
 			else
 			{
@@ -241,19 +236,12 @@ class ImapClient extends \MailSo\Net\NetClient
 				{
 					$this->oLogger->AddSecret($this->EscapeString($sPassword));
 				}
-
 				$this->SendRequestGetResponse('LOGIN',
 					array(
 						$this->EscapeString($sLogin),
 						$this->EscapeString($sPassword)
 					));
 			}
-//			else
-//			{
-//				$this->writeLogException(
-//					new Exceptions\LoginBadMethodException,
-//					\MailSo\Log\Enumerations\Type::NOTICE, true);
-//			}
 
 			if (0 < \strlen($sProxyAuthUser))
 			{
@@ -1033,6 +1021,23 @@ class ImapClient extends \MailSo\Net\NetClient
 		return $this->getResponse();
 	}
 
+	private function getResponseValue(ResponseCollection $oResponseCollection, int $type = 0) : string
+	{
+		$oResponse = $oResponseCollection->getLast();
+		if ($oResponse && (!$type || $type === $oResponse->ResponseType)) {
+			$sResult = $oResponse->ResponseList[1] ?? null;
+			if ($sResult) {
+				return $sResult;
+			}
+			$this->writeLogException(
+				new Exceptions\LoginException,
+				\MailSo\Log\Enumerations\Type::NOTICE, true);
+		}
+		$this->writeLogException(
+			new Exceptions\LoginException,
+			\MailSo\Log\Enumerations\Type::NOTICE, true);
+	}
+
 	public function GetLastResponse() : ResponseCollection
 	{
 		return $this->oLastResponse;
@@ -1086,6 +1091,17 @@ class ImapClient extends \MailSo\Net\NetClient
 		}
 
 		return $oResult;
+	}
+
+	private function skipBracketParse(?Response $oImapResponse) : bool
+	{
+		return $oImapResponse &&
+			$oImapResponse->ResponseType === \MailSo\Imap\Enumerations\ResponseType::UNTAGGED &&
+			(
+				($oImapResponse->StatusOrIndex === 'STATUS' && 2 === \count($oImapResponse->ResponseList)) ||
+				($oImapResponse->StatusOrIndex === 'LIST' && 4 === \count($oImapResponse->ResponseList)) ||
+				($oImapResponse->StatusOrIndex === 'LSUB' && 4 === \count($oImapResponse->ResponseList))
+			);
 	}
 
 	/**
@@ -1271,8 +1287,16 @@ class ImapClient extends \MailSo\Net\NetClient
 			{
 				case ']' === $sChar:
 				case ')' === $sChar:
-					++$iPos;
-					$sPreviousAtomUpperCase = null;
+					if ($this->skipBracketParse($oImapResponse))
+					{
+						$bIsGotoDefault = true;
+						$bIsGotoNotAtomBracket = false;
+					}
+					else
+					{
+						++$iPos;
+						$sPreviousAtomUpperCase = null;
+					}
 					break 2;
 				case ' ' === $sChar:
 					if ($bTreatAsAtom)
@@ -1289,12 +1313,20 @@ class ImapClient extends \MailSo\Net\NetClient
 					{
 						$sAtomBuilder .= $sChar;
 						$bIsGotoAtomBracket = true;
+						$this->iResponseBufParsedPos = ++$iPos;
+					}
+					else if ($this->skipBracketParse($oImapResponse))
+					{
+						$sOpenBracket = '';
+						$sClosingBracket = '';
+						$bIsGotoDefault = true;
+						$bIsGotoNotAtomBracket = false;
 					}
 					else
 					{
 						$bIsGotoNotAtomBracket = true;
+						$this->iResponseBufParsedPos = ++$iPos;
 					}
-					$this->iResponseBufParsedPos = ++$iPos;
 					break;
 				case '{' === $sChar:
 					$bIsLiteralParsed = false;
@@ -1422,6 +1454,10 @@ class ImapClient extends \MailSo\Net\NetClient
 						$sCharDef = $this->sResponseBuffer[$iPos];
 						switch (true)
 						{
+							case ('[' === $sCharDef || ']' === $sCharDef || '(' === $sCharDef || ')' === $sCharDef) &&
+								$this->skipBracketParse($oImapResponse):
+								++$iPos;
+								break;
 							case '[' === $sCharDef:
 								if (null === $sAtomBuilder)
 								{

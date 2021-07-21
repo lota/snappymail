@@ -21,7 +21,7 @@ import { serverRequest } from 'Common/Links';
 import { i18n, getNotification, getUploadErrorDescByCode } from 'Common/Translator';
 import { timestampToString } from 'Common/Momentor';
 import { MessageFlagsCache, setFolderHash } from 'Common/Cache';
-import { Settings, SettingsGet } from 'Common/Globals';
+import { doc, Settings, SettingsGet } from 'Common/Globals';
 
 import { AppUserStore } from 'Stores/User/App';
 import { SettingsUserStore } from 'Stores/User/Settings';
@@ -42,6 +42,8 @@ import { FolderSystemPopupView } from 'View/Popup/FolderSystem';
 import { AskPopupView } from 'View/Popup/Ask';
 import { ContactsPopupView } from 'View/Popup/Contacts';
 import { ComposeOpenPgpPopupView } from 'View/Popup/ComposeOpenPgp';
+
+import { ThemeStore } from 'Stores/Theme';
 
 const
 	/**
@@ -419,7 +421,24 @@ class ComposePopupView extends AbstractViewPopup {
 				setFolderHash(sSentFolder, '');
 
 				Remote.sendMessage(
-					this.sendMessageResponse.bind(this),
+					(iError, data) => {
+						this.sending(false);
+						if (this.modalVisibility()) {
+							if (iError) {
+								if (Notification.CantSaveMessage === iError) {
+									this.sendSuccessButSaveError(true);
+									this.savedErrorDesc(i18n('COMPOSE/SAVED_ERROR_ON_SEND').trim());
+								} else {
+									this.sendError(true);
+									this.sendErrorDesc(getNotification(iError, data && data.ErrorMessage)
+										|| getNotification(Notification.CantSendMessage));
+								}
+							} else {
+								this.closeCommand();
+							}
+						}
+						this.reloadDraftFolder();
+					},
 					this.getMessageRequestParams(sSentFolder)
 				);
 			}
@@ -438,7 +457,40 @@ class ComposePopupView extends AbstractViewPopup {
 			setFolderHash(FolderUserStore.draftFolder(), '');
 
 			Remote.saveMessage(
-				this.saveMessageResponse.bind(this),
+				(iError, oData) => {
+					let result = false;
+
+					this.saving(false);
+
+					if (!iError) {
+						if (oData.Result.NewFolder && oData.Result.NewUid) {
+							result = true;
+
+							if (this.bFromDraft) {
+								const message = MessageUserStore.message();
+								if (message && this.draftFolder() === message.folder && this.draftUid() === message.uid) {
+									MessageUserStore.message(null);
+								}
+							}
+
+							this.draftFolder(oData.Result.NewFolder);
+							this.draftUid(oData.Result.NewUid);
+
+							this.savedTime(new Date);
+
+							if (this.bFromDraft) {
+								setFolderHash(this.draftFolder(), '');
+							}
+						}
+					}
+
+					if (!result) {
+						this.savedError(true);
+						this.savedErrorDesc(getNotification(Notification.CantSaveMessage));
+					}
+
+					this.reloadDraftFolder();
+				},
 				this.getMessageRequestParams(FolderUserStore.draftFolder())
 			);
 		}
@@ -578,63 +630,6 @@ class ComposePopupView extends AbstractViewPopup {
 		}
 	}
 
-	sendMessageResponse(iError, data) {
-
-		this.sending(false);
-
-		if (this.modalVisibility()) {
-			if (iError) {
-				if (Notification.CantSaveMessage === iError) {
-					this.sendSuccessButSaveError(true);
-					this.savedErrorDesc(i18n('COMPOSE/SAVED_ERROR_ON_SEND').trim());
-				} else {
-					this.sendError(true);
-					this.sendErrorDesc(getNotification(iError, data && data.ErrorMessage)
-						|| getNotification(Notification.CantSendMessage));
-				}
-			} else {
-				this.closeCommand && this.closeCommand();
-			}
-		}
-
-		this.reloadDraftFolder();
-	}
-
-	saveMessageResponse(iError, oData) {
-		let result = false;
-
-		this.saving(false);
-
-		if (!iError) {
-			if (oData.Result.NewFolder && oData.Result.NewUid) {
-				result = true;
-
-				if (this.bFromDraft) {
-					const message = MessageUserStore.message();
-					if (message && this.draftFolder() === message.folder && this.draftUid() === message.uid) {
-						MessageUserStore.message(null);
-					}
-				}
-
-				this.draftFolder(oData.Result.NewFolder);
-				this.draftUid(oData.Result.NewUid);
-
-				this.savedTime(new Date);
-
-				if (this.bFromDraft) {
-					setFolderHash(this.draftFolder(), '');
-				}
-			}
-		}
-
-		if (!result) {
-			this.savedError(true);
-			this.savedErrorDesc(getNotification(Notification.CantSaveMessage));
-		}
-
-		this.reloadDraftFolder();
-	}
-
 	onHide() {
 		// Stop autosave
 		clearTimeout(this.iTimer);
@@ -650,6 +645,8 @@ class ComposePopupView extends AbstractViewPopup {
 		rl.route.on();
 
 		this.resizeObserver.disconnect();
+
+		(doc.fullscreenElement || doc.webkitFullscreenElement) === this.oContent && doc.exitFullscreen();
 	}
 
 	editor(fOnInit) {
@@ -746,12 +743,9 @@ class ComposePopupView extends AbstractViewPopup {
 		} else {
 			this.initOnShow(type, oMessageOrArray, aToEmails, aCcEmails, aBccEmails, sCustomSubject, sCustomPlainText);
 		}
-	}
 
-	onWarmUp() {
-		if (this.modalVisibility && !this.modalVisibility()) {
-			this.editor(editor => editor.modeWysiwyg());
-		}
+//		(navigator.standalone || matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches) &&
+		ThemeStore.isMobile() && this.oContent.requestFullscreen && this.oContent.requestFullscreen();
 	}
 
 	/**
@@ -1075,14 +1069,12 @@ class ComposePopupView extends AbstractViewPopup {
 	tryToClosePopup() {
 		if (!isPopupVisible(AskPopupView) && this.modalVisibility()) {
 			if (this.bSkipNextHide || (this.isEmptyForm() && !this.draftUid())) {
-				this.closeCommand && this.closeCommand();
+				this.closeCommand();
 			} else {
 				showScreenPopup(AskPopupView, [
 					i18n('POPUPS_ASK/DESC_WANT_CLOSE_THIS_WINDOW'),
 					() => {
-						if (this.modalVisibility()) {
-							this.closeCommand && this.closeCommand();
-						}
+						this.modalVisibility() && this.closeCommand();
 					}
 				]);
 			}
@@ -1146,6 +1138,28 @@ class ComposePopupView extends AbstractViewPopup {
 		ro.header = dom.querySelector('.b-header');
 		ro.toolbar = dom.querySelector('.b-header-toolbar');
 		ro.els = [dom.querySelector('.textAreaParent'), dom.querySelector('.attachmentAreaParent')];
+
+		this.editor(editor => editor.modeWysiwyg());
+
+		// Fullscreen must be on app, else other popups fail
+		const el = doc.getElementById('rl-app');
+		let event = 'fullscreenchange';
+		if (!el.requestFullscreen && el.webkitRequestFullscreen) {
+			el.requestFullscreen = el.webkitRequestFullscreen;
+			event = 'webkit' + event;
+		}
+		if (el.requestFullscreen) {
+			if (!doc.exitFullscreen && doc.webkitExitFullscreen) {
+				doc.exitFullscreen = doc.webkitExitFullscreen;
+			}
+			this.oContent = el;
+			el.addEventListener(event, () =>
+				ThemeStore.isMobile()
+				&& this.modalVisibility()
+				&& (doc.fullscreenElement || doc.webkitFullscreenElement) !== el
+				&& this.skipCommand()
+			);
+		}
 	}
 
 	/**

@@ -14,8 +14,6 @@ class Utils
 	 */
 	static $CookieDefaultSecure = null;
 
-	static $Cookies = null;
-
 	public static function EncryptString(string $sString, string $sKey) : string
 	{
 		return \MailSo\Base\Crypt::Encrypt($sString, $sKey);
@@ -133,52 +131,6 @@ class Utils
 		return $sResult;
 	}
 
-	public static function ReadAndAddLang(string $sFileName, array &$aResultLang) : void
-	{
-		if (\file_exists($sFileName))
-		{
-			if ('.yml' === \substr($sFileName, -4))
-			{
-				$aLang = \yaml_parse_file($sFileName);
-				if (\is_array($aLang))
-				{
-					\reset($aLang);
-					$sLangKey = \key($aLang);
-					if (isset($aLang[$sLangKey]) && \is_array($aLang[$sLangKey]))
-					{
-						$aLang = $aLang[$sLangKey];
-					}
-					else
-					{
-						$aLang = null;
-					}
-				}
-			}
-			else
-			{
-				$aLang = static::CustomParseIniFile($sFileName, true);
-			}
-
-			if (\is_array($aLang))
-			{
-				foreach ($aLang as $sKey => $mValue)
-				{
-					if (\is_array($mValue))
-					{
-						foreach ($mValue as $sSecKey => $mSecValue)
-						{
-							$aResultLang[$sKey.'/'.$sSecKey] = $mSecValue;
-						}
-					}
-					else
-					{
-						$aResultLang[$sKey] = $mValue;
-					}
-				}
-			}
-		}
-	}
-
 	public static function FolderFiles(string $sDir, string $sType = '') : array
 	{
 		$aResult = array();
@@ -207,13 +159,11 @@ class Utils
 	public static function ClearHtmlOutput(string $sHtml) : string
 	{
 //		return $sHtml;
-		return \trim(\str_replace('> <', '><',
-			\str_replace('" />', '"/>',
-			\preg_replace('/[\s]+&nbsp;/i', '&nbsp;',
-			\preg_replace('/&nbsp;[\s]+/i', '&nbsp;',
-			\preg_replace('/[\r\n\t]+/', ' ',
-			$sHtml
-		))))));
+		return \preg_replace(
+			['@"\\s*/>@', '/\\s*&nbsp;/i', '/&nbsp;\\s*/i', '/[\\r\\n\\t]+/', '/>\\s+</'],
+			['">', '&nbsp;', '&nbsp;', ' ', '><'],
+			\trim($sHtml)
+		);
 	}
 
 	public static function CompileTemplates(array &$aList, string $sDirName, string $sNameSuffix = '')
@@ -236,21 +186,11 @@ class Utils
 	 */
 	public static function GetCookie(string $sName, $mDefault = null)
 	{
-		if (null === static::$Cookies)
-		{
-			static::$Cookies = \is_array($_COOKIE) ? $_COOKIE : array();
-		}
-
-		return isset(static::$Cookies[$sName]) ? static::$Cookies[$sName] : $mDefault;
+		return isset($_COOKIE[$sName]) ? $_COOKIE[$sName] : $mDefault;
 	}
 
 	public static function SetCookie(string $sName, string $sValue = '', int $iExpire = 0, ?string $sPath = null, ?string $sDomain = null, ?bool $bSecure = null, bool $bHttpOnly = true)
 	{
-		if (null === static::$Cookies)
-		{
-			static::$Cookies = \is_array($_COOKIE) ? $_COOKIE : array();
-		}
-
 		if (null === $sPath)
 		{
 			$sPath = static::$CookieDefaultPath;
@@ -262,7 +202,7 @@ class Utils
 			$bSecure = static::$CookieDefaultSecure;
 		}
 
-		static::$Cookies[$sName] = $sValue;
+		$_COOKIE[$sName] = $sValue;
 		\setcookie($sName, $sValue, array(
 			'expires' => $iExpire,
 			'path' => $sPath,
@@ -275,22 +215,18 @@ class Utils
 
 	public static function ClearCookie(string $sName)
 	{
-		if (null === static::$Cookies)
-		{
-			static::$Cookies = \is_array($_COOKIE) ? $_COOKIE : array();
+		if (isset($_COOKIE[$sName])) {
+			$sPath = static::$CookieDefaultPath;
+			unset($_COOKIE[$sName]);
+			\setcookie($sName, '', array(
+				'expires' => \time() - 3600 * 24 * 30,
+				'path' => $sPath && 0 < \strlen($sPath) ? $sPath : '/',
+//				'domain' => null,
+				'secure' => static::$CookieDefaultSecure,
+				'httponly' => true,
+				'samesite' => 'Strict'
+			));
 		}
-
-		$sPath = static::$CookieDefaultPath;
-
-		unset(static::$Cookies[$sName]);
-		\setcookie($sName, '', array(
-			'expires' => \time() - 3600 * 24 * 30,
-			'path' => $sPath && 0 < \strlen($sPath) ? $sPath : '/',
-//			'domain' => null,
-			'secure' => static::$CookieDefaultSecure,
-			'httponly' => true,
-			'samesite' => 'Strict'
-		));
 	}
 
 	public static function UrlEncode(string $sV, bool $bEncode = false) : string
@@ -302,7 +238,7 @@ class Utils
 	{
 		static $sAppPath;
 		if (!$sAppPath) {
-			$sAppPath = \preg_replace('#index\\.php.*$#D', '$1', $_SERVER['SCRIPT_NAME']);
+			$sAppPath = \preg_replace('#index\\.php.*$#D', '', $_SERVER['SCRIPT_NAME']);
 //			$sAppPath = Api::Config()->Get('labs', 'app_default_path', '');
 		}
 		return $sAppPath;

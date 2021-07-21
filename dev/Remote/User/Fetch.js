@@ -55,74 +55,15 @@ class RemoteUserFetch extends AbstractFetchRemote {
 	 * @param {string} sPassword
 	 * @param {boolean} bSignMe
 	 * @param {string=} sLanguage
-	 * @param {string=} sAdditionalCode
-	 * @param {boolean=} bAdditionalCodeSignMe
 	 */
-	login(fCallback, sEmail, sPassword, bSignMe, sLanguage, sAdditionalCode, bAdditionalCodeSignMe) {
+	login(fCallback, sEmail, sPassword, bSignMe, sLanguage) {
 		this.defaultRequest(fCallback, 'Login', {
 			Email: sEmail,
 			Login: '',
 			Password: sPassword,
 			Language: sLanguage || '',
-			AdditionalCode: sAdditionalCode || '',
-			AdditionalCodeSignMe: bAdditionalCodeSignMe ? 1 : 0,
 			SignMe: bSignMe ? 1 : 0
 		});
-	}
-
-	/**
-	 * @param {?Function} fCallback
-	 */
-	getTwoFactor(fCallback) {
-		this.defaultRequest(fCallback, 'GetTwoFactorInfo');
-	}
-
-	/**
-	 * @param {?Function} fCallback
-	 */
-	createTwoFactor(fCallback) {
-		this.defaultRequest(fCallback, 'CreateTwoFactorSecret');
-	}
-
-	/**
-	 * @param {?Function} fCallback
-	 */
-	clearTwoFactor(fCallback) {
-		this.defaultRequest(fCallback, 'ClearTwoFactorInfo');
-	}
-
-	/**
-	 * @param {?Function} fCallback
-	 */
-	showTwoFactorSecret(fCallback) {
-		this.defaultRequest(fCallback, 'ShowTwoFactorSecret');
-	}
-
-	/**
-	 * @param {?Function} fCallback
-	 * @param {string} sCode
-	 */
-	testTwoFactor(fCallback, sCode) {
-		this.defaultRequest(fCallback, 'TestTwoFactorInfo', {
-			Code: sCode
-		});
-	}
-
-	/**
-	 * @param {?Function} fCallback
-	 * @param {boolean} bEnable
-	 */
-	enableTwoFactor(fCallback, bEnable) {
-		this.defaultRequest(fCallback, 'EnableTwoFactor', {
-			Enable: bEnable ? 1 : 0
-		});
-	}
-
-	/**
-	 * @param {?Function} fCallback
-	 */
-	clearTwoFactorInfo(fCallback) {
-		this.defaultRequest(fCallback, 'ClearTwoFactorInfo');
 	}
 
 	/**

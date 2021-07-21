@@ -14,35 +14,21 @@ trait Folders
 	{
 		$oAccount = $this->initMailClientConnection();
 
-		$oFolderCollection = null;
-		$this->Plugins()->RunHook('filter.folders-before', array($oAccount, $oFolderCollection));
-
 		$HideUnsubscribed = $this->Config()->Get('labs', 'use_imap_list_subscribe', true);
 		$oSettingsLocal = $this->SettingsProvider(true)->Load($oAccount);
 		if ($oSettingsLocal instanceof \RainLoop\Settings) {
 			$HideUnsubscribed = (bool) $oSettingsLocal->GetConf('HideUnsubscribed', $HideUnsubscribed);
 		}
 
-		if (null === $oFolderCollection)
-		{
-			$oFolderCollection = $this->MailClient()->Folders('',
-				'*',
-				$HideUnsubscribed,
-				(int) $this->Config()->Get('labs', 'imap_folder_list_limit', 200)
-			);
-		}
-
-		$this->Plugins()->RunHook('filter.folders-post', array($oAccount, $oFolderCollection));
+		$oFolderCollection = $this->MailClient()->Folders('',
+			'*',
+			$HideUnsubscribed,
+			(int) $this->Config()->Get('labs', 'imap_folder_list_limit', 200)
+		);
 
 		if ($oFolderCollection instanceof \MailSo\Mail\FolderCollection)
 		{
-			$aFolders = $oFolderCollection->getArrayCopy();
-			foreach ($aFolders as $i => $oFolder) {
-				if (!$oFolder->IsSelectable()) {
-					unset($aFolders[$i]);
-				}
-			}
-			$oFolderCollection->exchangeArray(\array_values($aFolders));
+			$this->Plugins()->RunHook('filter.folders-post', array($oAccount, $oFolderCollection));
 
 			$oSettingsLocal = $this->SettingsProvider(true)->Load($oAccount);
 
@@ -158,9 +144,9 @@ trait Folders
 			{
 				$oFolderCollection->FoldersHash = \md5(\implode("\x0", $this->recFoldersNames($oFolderCollection)));
 			}
-		}
 
-		$this->Plugins()->RunHook('filter.folders-complete', array($oAccount, $oFolderCollection));
+			$this->Plugins()->RunHook('filter.folders-complete', array($oAccount, $oFolderCollection));
+		}
 
 		return $this->DefaultResponse(__FUNCTION__, $oFolderCollection);
 	}
@@ -357,11 +343,8 @@ trait Folders
 		$aFlagsFilteredUids = array();
 		if (0 < strlen($sFlagsUids))
 		{
-			$aFlagsUids = explode(',', $sFlagsUids);
-			$aFlagsFilteredUids = array_filter($aFlagsUids, function (&$sUid) {
-				$sUid = (int) trim($sUid);
-				return 0 < (int) trim($sUid);
-			});
+			$aFlagsUids = \explode(',', $sFlagsUids);
+			$aFlagsFilteredUids = \array_filter(\array_map('intval', $aFlagsUids));
 		}
 
 		$this->initMailClientConnection();

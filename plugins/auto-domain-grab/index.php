@@ -14,6 +14,8 @@ class AutoDomainGrabPlugin extends \RainLoop\Plugins\AbstractPlugin
 {
 	const
 		NAME     = '',
+		VERSION = '2.1',
+		REQUIRED = '2.5.0',
 		CATEGORY = 'General',
 		DESCRIPTION = '';
 
@@ -22,8 +24,8 @@ class AutoDomainGrabPlugin extends \RainLoop\Plugins\AbstractPlugin
 
 	public function Init() : void
 	{
-		$this->addHook('filter.smtp-credentials', 'FilterSmtpCredentials');
-		$this->addHook('filter.imap-credentials', 'FilterImapCredentials');
+		$this->addHook('smtp.credentials', 'FilterSmtpCredentials');
+		$this->addHook('imap.credentials', 'FilterImapCredentials');
 	}
 
 	/**

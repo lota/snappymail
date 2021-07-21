@@ -744,7 +744,6 @@ END;
 			'sql'	=> 'text/plain',
 			'cfg'	=> 'text/plain',
 			'conf'	=> 'text/plain',
-			'asc'	=> 'text/plain',
 			'rtx'	=> 'text/richtext',
 			'vcard'	=> 'text/vcard',
 			'vcf'	=> 'text/vcard',
@@ -759,6 +758,7 @@ END;
 			'hlp'	=> 'application/winhlp',
 			'wgt'	=> 'application/widget',
 			'chm'	=> 'application/vnd.ms-htmlhelp',
+			'asc'   => 'application/pgp-signature',
 			'p10'	=> 'application/pkcs10',
 			'p7c'	=> 'application/pkcs7-mime',
 			'p7m'	=> 'application/pkcs7-mime',
@@ -770,11 +770,7 @@ END;
 			'pl'	=> 'text/perl',
 			'css'	=> 'text/css',
 			'asp'	=> 'text/asp',
-			'php'	=> 'application/x-httpd-php',
-			'php3'	=> 'application/x-httpd-php',
-			'php4'	=> 'application/x-httpd-php',
-			'php5'	=> 'application/x-httpd-php',
-			'phtml'	=> 'application/x-httpd-php',
+			'php'	=> 'application/x-php',
 
 			// images
 			'png'	=> 'image/png',
@@ -1826,26 +1822,13 @@ END;
 		return !empty($sIp) && $sIp === \filter_var($sIp, FILTER_VALIDATE_IP);
 	}
 
-	private static function idn() : \Net
-	{
-		static $oIdn = null;
-		if (null === $oIdn)
-		{
-			include_once dirname(__DIR__).'/Vendors/Net/IDNA2.php';
-			$oIdn = new \Net_IDNA2;
-			$oIdn->setParams('utf8', true);
-		}
-
-		return $oIdn;
-	}
-
 	public static function IdnToUtf8(string $sStr, bool $bLowerIfAscii = false) : string
 	{
 		if (0 < \strlen($sStr) && \preg_match('/(^|\.|@)xn--/i', $sStr))
 		{
 			try
 			{
-				$sStr = self::idn()->decode($sStr);
+				$sStr = \SnappyMail\IDN::anyToUtf8($sStr);
 			}
 			catch (\Throwable $oException) {}
 		}
@@ -1869,7 +1852,7 @@ END;
 		{
 			try
 			{
-				$sDomain = self::idn()->encode($sDomain);
+				$sDomain = \SnappyMail\IDN::anyToAscii($sDomain);
 			}
 			catch (\Throwable $oException) {}
 		}

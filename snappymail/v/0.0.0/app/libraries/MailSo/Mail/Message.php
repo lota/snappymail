@@ -17,227 +17,75 @@ namespace MailSo\Mail;
  */
 class Message implements \JsonSerializable
 {
-	/**
-	 * @var string
-	 */
-	private $sFolder;
+	private
+		$sFolder = '',
+		$iUid = 0,
+		$sSubject = '',
+		$sMessageId = '',
+		$sContentType = '',
+		$iSize = 0,
+		$iSpamScore = 0,
+		$sSpamResult = '',
+		$bIsSpam = false,
+		$iInternalTimeStampInUTC = 0,
+		$iHeaderTimeStampInUTC = 0,
+		$sHeaderDate = '',
+		$aFlags = [],
+		$aFlagsLowerCase = [],
 
-	/**
-	 * @var int
-	 */
-	private $iUid;
+		/**
+		 * @var \MailSo\Mime\EmailCollection
+		 */
+		$oFrom = null,
+		$oSender = null,
+		$oReplyTo = null,
+		$oDeliveredTo = null,
+		$oTo = null,
+		$oCc = null,
+		$oBcc = null,
 
-	/**
-	 * @var string
-	 */
-	private $sSubject;
+		$sInReplyTo = '',
 
-	/**
-	 * @var string
-	 */
-	private $sMessageId;
+		$sPlain = '',
+		$sHtml = '',
 
-	/**
-	 * @var string
-	 */
-	private $sContentType;
+		/**
+		 * @var AttachmentCollection
+		 */
+		$oAttachments = null,
 
-	/**
-	 * @var int
-	 */
-	private $iSize;
+		/**
+		 * @var array
+		 */
+		$aDraftInfo = null,
 
-	/**
-	 * @var int
-	 */
-	private $iInternalTimeStampInUTC;
+		$sReferences = '',
 
-	/**
-	 * @var int
-	 */
-	private $iHeaderTimeStampInUTC;
+		/**
+		 * @var int
+		 */
+		$iSensitivity,
+		$iPriority,
 
-	/**
-	 * @var string
-	 */
-	private $sHeaderDate;
+		$sDeliveryReceipt = '',
 
-	/**
-	 * @var array
-	 */
-	private $aFlags;
+		$sReadReceipt = '',
 
-	/**
-	 * @var array
-	 */
-	private $aFlagsLowerCase;
+		$aUnsubsribeLinks = array(),
 
-	/**
-	 * @var \MailSo\Mime\EmailCollection
-	 */
-	private $oFrom;
+		$aThreads = array(),
 
-	/**
-	 * @var \MailSo\Mime\EmailCollection
-	 */
-	private $oSender;
+		$bTextPartIsTrimmed = false,
 
-	/**
-	 * @var \MailSo\Mime\EmailCollection
-	 */
-	private $oReplyTo;
-
-	/**
-	 * @var \MailSo\Mime\EmailCollection
-	 */
-	private $oDeliveredTo;
-
-	/**
-	 * @var \MailSo\Mime\EmailCollection
-	 */
-	private $oTo;
-
-	/**
-	 * @var \MailSo\Mime\EmailCollection
-	 */
-	private $oCc;
-
-	/**
-	 * @var \MailSo\Mime\EmailCollection
-	 */
-	private $oBcc;
-
-	/**
-	 * @var string
-	 */
-	private $sInReplyTo;
-
-	/**
-	 * @var string
-	 */
-	private $sPlain;
-
-	/**
-	 * @var string
-	 */
-	private $sHtml;
-
-	/**
-	 * @var AttachmentCollection
-	 */
-	private $oAttachments;
-
-	/**
-	 * @var array
-	 */
-	private $aDraftInfo;
-
-	/**
-	 * @var string
-	 */
-	private $sReferences;
-
-	/**
-	 * @var int
-	 */
-	private $iSensitivity;
-
-	/**
-	 * @var int
-	 */
-	private $iPriority;
-
-	/**
-	 * @var string
-	 */
-	private $sDeliveryReceipt;
-
-	/**
-	 * @var string
-	 */
-	private $sReadReceipt;
-
-	/**
-	 * @var array
-	 */
-	private $aUnsubsribeLinks;
-
-	/**
-	 * @var array
-	 */
-	private $aThreads;
-
-	/**
-	 * @var bool
-	 */
-	private $bTextPartIsTrimmed;
-
-	/**
-	 * @var string
-	 */
-	private $sPgpSignature;
-
-	/**
-	 * @var bool
-	 */
-	private $bPgpSigned;
-
-	/**
-	 * @var bool
-	 */
-	private $bPgpEncrypted;
+		$sPgpSignature = '',
+		$sPgpSignatureMicAlg = '',
+		$bPgpSigned = false,
+		$bPgpEncrypted = false;
 
 	function __construct()
 	{
-		$this->Clear();
-	}
-
-	public function Clear() : self
-	{
-		$this->sFolder = '';
-		$this->iUid = 0;
-		$this->sSubject = '';
-		$this->sMessageId = '';
-		$this->sContentType = '';
-		$this->iSize = 0;
-		$this->iInternalTimeStampInUTC = 0;
-		$this->iHeaderTimeStampInUTC = 0;
-		$this->sHeaderDate = '';
-		$this->aFlags = array();
-		$this->aFlagsLowerCase = array();
-
-		$this->oFrom = null;
-		$this->oSender = null;
-		$this->oReplyTo = null;
-		$this->oDeliveredTo = null;
-		$this->oTo = null;
-		$this->oCc = null;
-		$this->oBcc = null;
-
-		$this->sPlain = '';
-		$this->sHtml = '';
-
-		$this->oAttachments = null;
-		$this->aDraftInfo = null;
-
-		$this->sInReplyTo = '';
-		$this->sReferences = '';
-		$this->aUnsubsribeLinks = array();
-
 		$this->iSensitivity = \MailSo\Mime\Enumerations\Sensitivity::NOTHING;
 		$this->iPriority = \MailSo\Mime\Enumerations\MessagePriority::NORMAL;
-		$this->sDeliveryReceipt = '';
-		$this->sReadReceipt = '';
-
-		$this->aThreads = array();
-
-		$this->bTextPartIsTrimmed = false;
-
-		$this->sPgpSignature = '';
-		$this->bPgpSigned = false;
-		$this->bPgpEncrypted = false;
-
-		return $this;
 	}
 
 	public function Plain() : string
@@ -253,6 +101,11 @@ class Message implements \JsonSerializable
 	public function PgpSignature() : string
 	{
 		return $this->sPgpSignature;
+	}
+
+	public function PgpSignatureMicAlg() : string
+	{
+		return $this->sPgpSignatureMicAlg;
 	}
 
 	public function isPgpSigned() : bool
@@ -298,6 +151,21 @@ class Message implements \JsonSerializable
 	public function Size() : int
 	{
 		return $this->iSize;
+	}
+
+	public function SpamScore() : int
+	{
+		return $this->iSpamScore;
+	}
+
+	public function SpamResult() : string
+	{
+		return $this->sSpamResult;
+	}
+
+	public function IsSpam() : bool
+	{
+		return $this->bIsSpam;
 	}
 
 	public function InternalTimeStampInUTC() : int
@@ -556,7 +424,7 @@ class Message implements \JsonSerializable
 				$this->sReadReceipt = \trim($oHeaders->ValueByName(\MailSo\Mime\Enumerations\Header::X_CONFIRM_READING_TO));
 			}
 
-			//Unsubscribe links
+			// Unsubscribe links
 			$this->aUnsubsribeLinks = $oHeaders->ValueByName(\MailSo\Mime\Enumerations\Header::LIST_UNSUBSCRIBE);
 			if (empty($this->aUnsubsribeLinks))
 			{
@@ -571,6 +439,32 @@ class Message implements \JsonSerializable
 					},
 					$this->aUnsubsribeLinks
 				);
+			}
+
+			if ($spam = $oHeaders->ValueByName(\MailSo\Mime\Enumerations\Header::X_SPAMD_RESULT)) {
+				if (\preg_match('/\\[([\\d\\.-]+)\\s*\\/\\s*([\\d\\.]+)\\];/', $spam, $match)) {
+					if ($threshold = \floatval($match[2])) {
+						$this->iSpamScore = \max(0, \min(100, 100 * \floatval($match[1]) / $threshold));
+						$this->sSpamResult = "{$match[1]} / {$match[2]}";
+					}
+				}
+				$this->bIsSpam = false !== \stripos($this->sSubject, '*** SPAM ***');
+			} else if ($spam = $oHeaders->ValueByName(\MailSo\Mime\Enumerations\Header::X_BOGOSITY)) {
+				$this->sSpamResult = $spam;
+				$this->bIsSpam = !!\preg_match('/yes|spam/', $spam);
+				if (\preg_match('/spamicity=([\\d\\.]+)/', $spam, $spamicity)) {
+					$this->iSpamScore = \max(0, \min(100, \floatval($spamicity[1])));
+				}
+			} else if ($spam = $oHeaders->ValueByName(\MailSo\Mime\Enumerations\Header::X_SPAM_STATUS)) {
+				if (\preg_match('/(?:hits|score)=([\\d\\.-]+)/', $spam, $value)
+				 && \preg_match('/required=([\\d\\.-]+)/', $spam, $required)) {
+					if ($threshold = \floatval($required[1])) {
+						$this->iSpamScore = \max(0, \min(100, 100 * \floatval($value[1]) / $threshold));
+						$this->sSpamResult = "{$value[1]} / {$required[1]}";
+					}
+				}
+				$spam = $oHeaders->ValueByName(\MailSo\Mime\Enumerations\Header::X_SPAM_FLAG);
+				$this->bIsSpam = false !== \stripos($spam, 'YES');
 			}
 
 			$sDraftInfo = $oHeaders->ValueByName(\MailSo\Mime\Enumerations\Header::X_DRAFT_INFO);
@@ -625,6 +519,24 @@ class Message implements \JsonSerializable
 			$this->oBcc = $oFetchResponse->GetFetchEnvelopeEmailCollection(7, $sCharset);
 			$this->sInReplyTo = $oFetchResponse->GetFetchEnvelopeValue(8, '');
 		}
+
+		// Content-Type: multipart/signed; micalg="pgp-sha256"; protocol="application/pgp-signature"
+		if ('multipart/signed' === \strtolower($this->sContentType)
+		 && 'application/pgp-signature' === \strtolower($oHeaders->ParameterValue(\MailSo\Mime\Enumerations\Header::CONTENT_TYPE, \MailSo\Mime\Enumerations\Parameter::PROTOCOL)))
+		{
+			$aPgpSignatureParts = $oBodyStructure ? $oBodyStructure->SearchByContentType('application/pgp-signature') : null;
+			if ($this->bPgpSigned = !empty($aPgpSignatureParts)) {
+				$sPgpSignatureText = $oFetchResponse->GetFetchValue(\MailSo\Imap\Enumerations\FetchType::BODY.'['.$aPgpSignatureParts[0]->PartID().']');
+				if (\is_string($sPgpSignatureText) && 0 < \strlen($sPgpSignatureText) && 0 < \strpos($sPgpSignatureText, 'BEGIN PGP SIGNATURE')) {
+					$this->sPgpSignature = \trim($sPgpSignatureText);
+					$this->sPgpSignatureMicAlg = (string) $oHeaders->ParameterValue(\MailSo\Mime\Enumerations\Header::CONTENT_TYPE, 'micalg');
+				}
+			}
+		}
+
+		// Content-Type: multipart/encrypted; protocol="application/pgp-encrypted"
+		$this->bPgpEncrypted = ('multipart/encrypted' === \strtolower($this->sContentType)
+		 && 'application/pgp-encrypted' === \strtolower($oHeaders->ParameterValue(\MailSo\Mime\Enumerations\Header::CONTENT_TYPE, \MailSo\Mime\Enumerations\Parameter::PROTOCOL)));
 
 		$aTextParts = $oBodyStructure ? $oBodyStructure->SearchHtmlOrPlainParts() : null;
 		if ($aTextParts)
@@ -689,38 +601,16 @@ class Message implements \JsonSerializable
 			}
 
 			$aMatch = array();
-			if (\preg_match('/-----BEGIN PGP SIGNATURE-----(.+)-----END PGP SIGNATURE-----/ism', $this->sPlain, $aMatch) && !empty($aMatch[0]))
+			if (!$this->bPgpSigned && \preg_match('/-----BEGIN PGP SIGNATURE-----(.+)-----END PGP SIGNATURE-----/ism', $this->sPlain, $aMatch) && !empty($aMatch[0]))
 			{
 				$this->sPgpSignature = \trim($aMatch[0]);
 				$this->bPgpSigned = true;
 			}
 
-			$aMatch = array();
-			if (\preg_match('/-----BEGIN PGP MESSAGE-----/ism', $this->sPlain, $aMatch) && !empty($aMatch[0]))
-			{
-				$this->bPgpEncrypted = true;
-			}
+			$this->bPgpEncrypted = !$this->bPgpEncrypted && false !== \stripos($this->sPlain, '-----BEGIN PGP MESSAGE-----');
 
 			unset($aHtmlParts, $aPlainParts, $aMatch);
 		}
-
-//		if (empty($this->sPgpSignature) && 'multipart/signed' === \strtolower($this->sContentType) &&
-//			'application/pgp-signature' === \strtolower($oHeaders->ParameterValue(
-//				\MailSo\Mime\Enumerations\Header::CONTENT_TYPE,
-//				\MailSo\Mime\Enumerations\Parameter::PROTOCOL
-//			)))
-//		{
-//			$aPgpSignatureParts = $oBodyStructure ? $oBodyStructure->SearchByContentType('application/pgp-signature') : null;
-//			if (\is_array($aPgpSignatureParts) && 0 < \count($aPgpSignatureParts) && isset($aPgpSignatureParts[0]))
-//			{
-//				$sPgpSignatureText = $oFetchResponse->GetFetchValue(\MailSo\Imap\Enumerations\FetchType::BODY.'['.$aPgpSignatureParts[0]->PartID().']');
-//				if (\is_string($sPgpSignatureText) && 0 < \strlen($sPgpSignatureText) && 0 < \strpos($sPgpSignatureText, 'BEGIN PGP SIGNATURE'))
-//				{
-//					$this->sPgpSignature = \trim($sPgpSignatureText);
-//					$this->bPgpSigned = true;
-//				}
-//			}
-//		}
 
 		if ($oBodyStructure)
 		{
@@ -751,6 +641,9 @@ class Message implements \JsonSerializable
 			'Subject' => \trim(\MailSo\Base\Utils::Utf8Clear($this->Subject())),
 			'MessageId' => $this->MessageId(),
 			'Size' => $this->Size(),
+			'SpamScore' => $this->SpamScore(),
+			'SpamResult' => $this->SpamResult(),
+			'IsSpam' => $this->IsSpam(),
 			'DateTimeStampInUTC' => $this->InternalTimeStampInUTC(),
 
 			// \MailSo\Mime\EmailCollection

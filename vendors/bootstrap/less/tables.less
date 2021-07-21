@@ -12,12 +12,6 @@
   background-color: @tableBackground;
   border-collapse: collapse;
   border-spacing: 0;
-}
-
-// BASELINE STYLES
-// ---------------
-
-.table {
   width: 100%;
   margin-bottom: @baseLineHeight;
   // Cells
@@ -42,10 +36,6 @@
   thead:first-child tr:first-child th,
   thead:first-child tr:first-child td {
     border-top: 0;
-  }
-  // Account for multiple tbody instances
-  tbody + tbody {
-    border-top: 2px solid @tableBorder;
   }
 }
 

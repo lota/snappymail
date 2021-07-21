@@ -3,7 +3,7 @@ import { Notification, UploadErrorCode } from 'Common/Enums';
 import { langLink } from 'Common/Links';
 import { doc, createElement } from 'Common/Globals';
 
-let I18N_DATA = window.rainloopI18N || {};
+let I18N_DATA = {};
 
 export const trigger = ko.observable(false);
 
@@ -14,14 +14,16 @@ export const trigger = ko.observable(false);
  * @returns {string}
  */
 export function i18n(key, valueList, defaulValue) {
-	let result = I18N_DATA[key] || defaulValue || key;
-
+	let path = key.split('/');
+	if (!I18N_DATA[path[0]] || !path[1]) {
+		return defaulValue || key;
+	}
+	let result = I18N_DATA[path[0]][path[1]] || defaulValue || key;
 	if (valueList) {
 		Object.entries(valueList).forEach(([key, value]) => {
 			result = result.replace('%' + key + '%', value);
 		});
 	}
-
 	return result;
 }
 
@@ -47,9 +49,20 @@ const i18nToNode = element => {
 	}
 },
 
+	init = () => {
+		if (rl.I18N) {
+			I18N_DATA = rl.I18N;
+			Date.defineRelativeTimeFormat(rl.relativeTime || {});
+			rl.I18N = null;
+			return 1;
+		}
+	},
+
 	i18nKey = key => key.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase(),
 
 	getKeyByValue = (o, v) => Object.keys(o).find(key => o[key] === v);
+
+init();
 
 /**
  * @param {Object} elements
@@ -75,7 +88,7 @@ function getNotificationMessage(code) {
 	let key = getKeyByValue(Notification, code);
 	if (key) {
 		key = i18nKey(key).replace('_NOTIFICATION', '_ERROR');
-		return I18N_DATA['NOTIFICATIONS/' + key];
+		return I18N_DATA.NOTIFICATIONS[key];
 	}
 }
 
@@ -125,13 +138,11 @@ export function reload(admin, language) {
 		const script = createElement('script');
 		script.onload = () => {
 			// reload the data
-			if (window.rainloopI18N) {
-				I18N_DATA = window.rainloopI18N || {};
+			if (init()) {
 				i18nToNodes(doc);
-				dispatchEvent(new CustomEvent('reload-time'));
+				admin || rl.app.reloadTime();
 				trigger(!trigger());
 			}
-			window.rainloopI18N = null;
 			script.remove();
 			resolve();
 		};
@@ -150,7 +161,7 @@ export function reload(admin, language) {
  */
 export function convertLangName(language, isEng = false) {
 	return i18n(
-		'LANGS_NAMES' + (true === isEng ? '_EN' : '') + '/LANG_' + language.toUpperCase().replace(/[^a-zA-Z0-9]+/g, '_'),
+		'LANGS_NAMES' + (true === isEng ? '_EN' : '') + '/' + language,
 		null,
 		language
 	);

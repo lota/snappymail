@@ -14,8 +14,6 @@ class PluginPopupView extends AbstractViewPopup {
 	constructor() {
 		super('Plugin');
 
-		this.onPluginSettingsUpdateResponse = this.onPluginSettingsUpdateResponse.bind(this);
-
 		this.addObservables({
 			saveError: '',
 			name: '',
@@ -50,15 +48,11 @@ class PluginPopupView extends AbstractViewPopup {
 		});
 
 		this.saveError('');
-		Remote.pluginSettingsUpdate(this.onPluginSettingsUpdateResponse, list);
-	}
-
-	onPluginSettingsUpdateResponse(iError) {
-		if (iError) {
-			this.saveError(getNotification(iError));
-		} else {
-			this.cancelCommand();
-		}
+		Remote.pluginSettingsUpdate(iError =>
+			iError
+				? this.saveError(getNotification(iError))
+				: this.cancelCommand()
+		, list);
 	}
 
 	onShow(oPlugin) {
@@ -91,7 +85,7 @@ class PluginPopupView extends AbstractViewPopup {
 		if (!isPopupVisible(AskPopupView)) {
 			showScreenPopup(AskPopupView, [
 				i18n('POPUPS_ASK/DESC_WANT_CLOSE_THIS_WINDOW'),
-				() => this.modalVisibility() && this.cancelCommand && this.cancelCommand()
+				() => this.modalVisibility() && this.cancelCommand()
 			]);
 		}
 	}

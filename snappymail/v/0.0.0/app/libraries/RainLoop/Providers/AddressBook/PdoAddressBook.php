@@ -8,6 +8,8 @@ class PdoAddressBook
 	extends \RainLoop\Common\PdoAbstract
 	implements \RainLoop\Providers\AddressBook\AddressBookInterface
 {
+	use CardDAV;
+
 	/**
 	 * @var string
 	 */
@@ -40,7 +42,7 @@ class PdoAddressBook
 
 	public function IsSupported() : bool
 	{
-		$aDrivers = \class_exists('PDO') ? \PDO::getAvailableDrivers() : array();
+		$aDrivers = static::getAvailableDrivers();
 		return \is_array($aDrivers) && \in_array($this->sDsnType, $aDrivers);
 	}
 
@@ -104,504 +106,6 @@ class PdoAddressBook
 		return $aResult;
 	}
 
-	private function prepearRemoteSyncData($oClient, string $sPath)
-	{
-		$mResult = false;
-		$aResponse = null;
-		try
-		{
-			$this->oLogger->Write('PROPFIND '.$sPath, \MailSo\Log\Enumerations\Type::INFO, 'DAV');
-
-			$aResponse = $oClient->propFind($sPath, array(
-				'{DAV:}getlastmodified',
-				'{DAV:}resourcetype',
-				'{DAV:}getetag'
-			), 1);
-
-//			$this->oLogger->WriteDump($aResponse);
-		}
-		catch (\Throwable $oException)
-		{
-			$this->oLogger->WriteException($oException);
-		}
-
-		if (\is_array($aResponse))
-		{
-			$mResult = array();
-			foreach ($aResponse as $sKey => $aItem)
-			{
-				$sKey = \rtrim(\trim($sKey), '\\/');
-				if (!empty($sKey) && is_array($aItem))
-				{
-					$aItem = \array_change_key_case($aItem, \CASE_LOWER);
-					if (isset($aItem['{dav:}getetag']))
-					{
-						$aMatch = array();
-						if (\preg_match('/\/([^\/?]+)$/', $sKey, $aMatch) && !empty($aMatch[1]) &&
-							(!$aItem['{dav:}resourcetype'] || !$aItem['{dav:}resourcetype']->is('{DAV:}collection')))
-						{
-							$sVcfFileName = \urldecode(\urldecode($aMatch[1]));
-							$sKeyID = \preg_replace('/\.vcf$/i', '', $sVcfFileName);
-
-							$mResult[$sKeyID] = array(
-								'deleted' => false,
-								'uid' => $sKeyID,
-								'vcf' => $sVcfFileName,
-								'etag' => \trim(\trim($aItem['{dav:}getetag']), '"\''),
-								'lastmodified' => '',
-								'changed' => 0
-							);
-
-							if (isset($aItem['{dav:}getlastmodified']))
-							{
-								$mResult[$sKeyID]['lastmodified'] = $aItem['{dav:}getlastmodified'];
-								$mResult[$sKeyID]['changed'] = \MailSo\Base\DateTimeHelper::ParseRFC2822DateString(
-									$aItem['{dav:}getlastmodified']);
-							}
-							else
-							{
-								$mResult[$sKeyID]['changed'] = \MailSo\Base\DateTimeHelper::TryToParseSpecEtagFormat($mResult[$sKeyID]['etag']);
-								$mResult[$sKeyID]['lastmodified'] = 0 < $mResult[$sKeyID]['changed'] ?
-									\gmdate('c', $mResult[$sKeyID]['changed']) : '';
-							}
-
-							$mResult[$sKeyID]['changed_'] = \gmdate('c', $mResult[$sKeyID]['changed']);
-						}
-					}
-				}
-			}
-		}
-
-		return $mResult;
-	}
-
-	private function davClientRequest($oClient, string $sCmd, string $sUrl, $mData = null) : ?array
-	{
-		\MailSo\Base\Utils::ResetTimeLimit();
-
-		$this->oLogger->Write($sCmd.' '.$sUrl.(('PUT' === $sCmd || 'POST' === $sCmd) && null !== $mData ? ' ('.\strlen($mData).')' : ''),
-			\MailSo\Log\Enumerations\Type::INFO, 'DAV');
-
-//		if ('PUT' === $sCmd || 'POST' === $sCmd)
-//		{
-//			$this->oLogger->Write($mData, \MailSo\Log\Enumerations\Type::INFO, 'DAV');
-//		}
-
-		$aResponse = null;
-		try
-		{
-			if (('PUT' === $sCmd || 'POST' === $sCmd) && null !== $mData)
-			{
-				$aResponse = $oClient->request($sCmd, $sUrl, $mData, array(
-					'Content-Type' => 'text/vcard; charset=utf-8'
-				));
-			}
-			else
-			{
-				$aResponse = $oClient->request($sCmd, $sUrl);
-			}
-
-//			if ('GET' === $sCmd)
-//			{
-//				$this->oLogger->WriteDump($aResponse, \MailSo\Log\Enumerations\Type::INFO, 'DAV');
-//			}
-		}
-		catch (\Throwable $oException)
-		{
-			$this->oLogger->WriteException($oException);
-		}
-
-		return $aResponse;
-	}
-
-	private function detectionPropFind(\SabreForRainLoop\DAV\Client $oClient, string $sPath) : ?array
-	{
-		$aResponse = null;
-
-		try
-		{
-			$this->oLogger->Write('PROPFIND '.$sPath, \MailSo\Log\Enumerations\Type::INFO, 'DAV');
-
-			$aResponse = $oClient->propFind($sPath, array(
-				'{DAV:}current-user-principal',
-				'{DAV:}resourcetype',
-				'{DAV:}displayname',
-				'{urn:ietf:params:xml:ns:carddav}addressbook-home-set'
-			), 1);
-
-//			$this->oLogger->WriteDump($aResponse);
-		}
-		catch (\Throwable $oException)
-		{
-			$this->oLogger->WriteException($oException);
-		}
-
-		return $aResponse;
-	}
-
-	private function getContactsPaths(\SabreForRainLoop\DAV\Client $oClient, string $sUser, string $sPassword, string $sProxy = '') : array
-	{
-		$aContactsPaths = array();
-
-		$sCurrentUserPrincipal = '';
-		$sAddressbookHomeSet = '';
-
-//		[{DAV:}current-user-principal] => /cloud/remote.php/carddav/principals/admin/
-//		[{urn:ietf:params:xml:ns:carddav}addressbook-home-set] => /cloud/remote.php/carddav/addressbooks/admin/
-
-		if (!$oClient)
-		{
-			return $aContactsPaths;
-		}
-
-		$aResponse = $this->detectionPropFind($oClient, '/.well-known/carddav');
-
-		$sNextPath = '';
-		$sFirstNextPath = '';
-		if (\is_array($aResponse))
-		{
-			foreach ($aResponse as $sKey => $aItem)
-			{
-				if (empty($sAddressbookHomeSet) && !empty($aItem['{urn:ietf:params:xml:ns:carddav}addressbook-home-set']) &&
-					false === \strpos($aItem['{urn:ietf:params:xml:ns:carddav}addressbook-home-set'], '/calendar-proxy'))
-				{
-					$sAddressbookHomeSet = $aItem['{urn:ietf:params:xml:ns:carddav}addressbook-home-set'];
-					continue;
-				}
-
-				if (empty($sCurrentUserPrincipal) && !empty($aItem['{DAV:}current-user-principal']))
-				{
-					$sCurrentUserPrincipal = $aItem['{DAV:}current-user-principal'];
-					continue;
-				}
-
-				if (!empty($sKey))
-				{
-					if (empty($sFirstNextPath))
-					{
-						$sFirstNextPath = $sKey;
-					}
-
-					if (empty($sNextPath))
-					{
-						$oResourceType = isset($aItem['{DAV:}resourcetype']) ? $aItem['{DAV:}resourcetype'] : null;
-						/* @var $oResourceType \SabreForRainLoop\DAV\Property\ResourceType */
-						if ($oResourceType && $oResourceType->is('{DAV:}collection'))
-						{
-							$sNextPath = $sKey;
-							continue;
-						}
-					}
-				}
-			}
-
-			if (empty($sNextPath) && empty($sCurrentUserPrincipal) && empty($sAddressbookHomeSet) && !empty($sFirstNextPath))
-			{
-				$sNextPath = $sFirstNextPath;
-			}
-		}
-
-		if (empty($sCurrentUserPrincipal) && empty($sAddressbookHomeSet))
-		{
-			if (empty($sNextPath))
-			{
-				return $aContactsPaths;
-			}
-			else
-			{
-				if (\preg_match('/^http[s]?:\/\//i', $sNextPath))
-				{
-					$oClient = $this->getDavClientFromUrl($sNextPath, $sUser, $sPassword, $sProxy);
-					if ($oClient)
-					{
-						$sNextPath = $oClient->__UrlPath__;
-					}
-					else
-					{
-						return $aContactsPaths;
-					}
-				}
-
-				$aResponse = $this->detectionPropFind($oClient, $sNextPath);
-				if (\is_array($aResponse))
-				{
-					foreach ($aResponse as $sKey => $aItem)
-					{
-						if (empty($sAddressbookHomeSet) && !empty($aItem['{urn:ietf:params:xml:ns:carddav}addressbook-home-set']) &&
-							false === \strpos($aItem['{urn:ietf:params:xml:ns:carddav}addressbook-home-set'], '/calendar-proxy'))
-						{
-							$sAddressbookHomeSet = $aItem['{urn:ietf:params:xml:ns:carddav}addressbook-home-set'];
-							continue;
-						}
-
-						if (empty($sCurrentUserPrincipal) && !empty($aItem['{DAV:}current-user-principal']))
-						{
-							$sCurrentUserPrincipal = $aItem['{DAV:}current-user-principal'];
-							continue;
-						}
-					}
-				}
-			}
-		}
-
-		if (empty($sAddressbookHomeSet))
-		{
-			if (empty($sCurrentUserPrincipal))
-			{
-				return $aContactsPaths;
-			}
-			else
-			{
-				if (\preg_match('/^http[s]?:\/\//i', $sCurrentUserPrincipal))
-				{
-					$oClient = $this->getDavClientFromUrl($sCurrentUserPrincipal, $sUser, $sPassword, $sProxy);
-					if ($oClient)
-					{
-						$sCurrentUserPrincipal = $oClient->__UrlPath__;
-					}
-					else
-					{
-						return $aContactsPaths;
-					}
-				}
-
-				$aResponse = $this->detectionPropFind($oClient, $sCurrentUserPrincipal);
-				if (\is_array($aResponse))
-				{
-					foreach ($aResponse as $sKey => $aItem)
-					{
-						if (empty($sAddressbookHomeSet) && !empty($aItem['{urn:ietf:params:xml:ns:carddav}addressbook-home-set']) &&
-							false === \strpos($aItem['{urn:ietf:params:xml:ns:carddav}addressbook-home-set'], '/calendar-proxy'))
-						{
-							$sAddressbookHomeSet = $aItem['{urn:ietf:params:xml:ns:carddav}addressbook-home-set'];
-							continue;
-						}
-					}
-				}
-			}
-		}
-
-		if (empty($sAddressbookHomeSet))
-		{
-			return $aContactsPaths;
-		}
-		else
-		{
-			if (\preg_match('/^http[s]?:\/\//i', $sAddressbookHomeSet))
-			{
-				$oClient = $this->getDavClientFromUrl($sAddressbookHomeSet, $sUser, $sPassword, $sProxy);
-				if ($oClient)
-				{
-					$sAddressbookHomeSet = $oClient->__UrlPath__;
-				}
-				else
-				{
-					return $aContactsPaths;
-				}
-			}
-
-			$aResponse = $this->detectionPropFind($oClient, $sAddressbookHomeSet);
-			if (\is_array($aResponse))
-			{
-				foreach ($aResponse as $sKey => $aItem)
-				{
-					if (!empty($sKey) && $aItem && isset($aItem['{DAV:}resourcetype']))
-					{
-						$oResourceType = $aItem['{DAV:}resourcetype'];
-						/* @var $oResourceType \SabreForRainLoop\DAV\Property\ResourceType */
-
-						if ($oResourceType && $oResourceType->is('{DAV:}collection'))
-						{
-							if ($oResourceType->is('{urn:ietf:params:xml:ns:carddav}addressbook'))
-							{
-								$aContactsPaths[$sKey] = isset($aItem['{DAV:}displayname']) ? \trim($aItem['{DAV:}displayname']) : '';
-							}
-						}
-					}
-				}
-			}
-		}
-
-		return $aContactsPaths;
-	}
-
-	private function checkContactsPath(\SabreForRainLoop\DAV\Client $oClient, string $sPath) : bool
-	{
-		if (!$oClient)
-		{
-			return false;
-		}
-
-		$this->oLogger->Write('PROPFIND '.$sPath, \MailSo\Log\Enumerations\Type::INFO, 'DAV');
-
-		$aResponse = null;
-		try
-		{
-			$aResponse = $oClient->propFind($sPath, array(
-				'{DAV:}resourcetype'
-			), 1);
-
-//			$this->oLogger->WriteDump($aResponse);
-		}
-		catch (\Throwable $oException)
-		{
-			$this->oLogger->WriteException($oException);
-		}
-
-		$bGood = false;
-		if (\is_array($aResponse))
-		{
-			foreach ($aResponse as $sKey => $aItem)
-			{
-				if (!empty($sKey) && isset($aItem['{DAV:}resourcetype']))
-				{
-					$oResourceType = $aItem['{DAV:}resourcetype'];
-					/* @var $oResourceType \SabreForRainLoop\DAV\Property\ResourceType */
-
-					if ($oResourceType && $oResourceType->is('{DAV:}collection') &&
-						$oResourceType->is('{urn:ietf:params:xml:ns:carddav}addressbook'))
-					{
-						$bGood = true;
-					}
-				}
-			}
-		}
-
-		if ($bGood)
-		{
-			$oClient->__UrlPath__ = $sPath;
-		}
-
-		return $bGood;
-	}
-
-	public function getDavClientFromUrl(string $sUrl, string $sUser, string $sPassword, string $sProxy = '') : \SabreForRainLoop\DAV\Client
-	{
-		if (!\preg_match('/^http[s]?:\/\//i', $sUrl))
-		{
-			$sUrl = \preg_replace('/^fruux\.com/i', 'dav.fruux.com', $sUrl);
-			$sUrl = \preg_replace('/^icloud\.com/i', 'contacts.icloud.com', $sUrl);
-			$sUrl = \preg_replace('/^gmail\.com/i', 'google.com', $sUrl);
-			$sUrl = 'https://'.$sUrl;
-		}
-
-		$aUrl = \parse_url($sUrl);
-		if (!\is_array($aUrl))
-		{
-			$aUrl = array();
-		}
-
-		$aUrl['scheme'] = $aUrl['scheme'] ?? 'http';
-		$aUrl['host'] = $aUrl['host'] ?? 'localhost';
-		$aUrl['port'] = $aUrl['port'] ?? 0;
-		$aUrl['path'] = isset($aUrl['path']) ? \rtrim($aUrl['path'], '\\/').'/' : '/';
-
-		$aSettings = array(
-			'baseUri' => $aUrl['scheme'].'://'.$aUrl['host'].($aUrl['port'] ? ':'.$aUrl['port'] : ''),
-			'userName' => $sUser,
-			'password' => $sPassword
-		);
-
-		$this->oLogger->AddSecret($sPassword);
-
-		if (!empty($sProxy))
-		{
-			$aSettings['proxy'] = $sProxy;
-		}
-
-		$oClient = new \SabreForRainLoop\DAV\Client($aSettings);
-		$oClient->setVerifyPeer(false);
-
-		$oClient->__UrlPath__ = $aUrl['path'];
-
-		$this->oLogger->Write('DavClient: User: '.$aSettings['userName'].', Url: '.$sUrl, \MailSo\Log\Enumerations\Type::INFO, 'DAV');
-
-		return $oClient;
-	}
-
-	public function getDavClient(string $sUrl, string $sUser, string $sPassword, string $sProxy = '') : ?\SabreForRainLoop\DAV\Client
-	{
-		if (!\class_exists('SabreForRainLoop\DAV\Client'))
-		{
-			return null;
-		}
-
-		$aMatch = array();
-		$sUserAddressBookNameName = '';
-
-		if (\preg_match('/\|(.+)$/', $sUrl, $aMatch) && !empty($aMatch[1]))
-		{
-			$sUserAddressBookNameName = \trim($aMatch[1]);
-			$sUserAddressBookNameName = \MailSo\Base\Utils::StrToLowerIfAscii($sUserAddressBookNameName);
-
-			$sUrl = \preg_replace('/\|(.+)$/', '', $sUrl);
-		}
-
-		$oClient = $this->getDavClientFromUrl($sUrl, $sUser, $sPassword, $sProxy);
-		if (!$oClient)
-		{
-			return null;
-		}
-
-		$sPath = $oClient->__UrlPath__;
-
-		$bGood = true;
-		if ('' === $sPath || '/' === $sPath || !$this->checkContactsPath($oClient, $sPath))
-		{
-			$sNewPath = '';
-
-			$aPaths = $this->getContactsPaths($oClient, $sUser, $sPassword, $sProxy);
-			$this->oLogger->WriteDump($aPaths);
-
-			if (\is_array($aPaths))
-			{
-				if (1 < \count($aPaths))
-				{
-					if ('' !== $sUserAddressBookNameName)
-					{
-						foreach ($aPaths as $sKey => $sValue)
-						{
-							$sValue = \MailSo\Base\Utils::StrToLowerIfAscii(\trim($sValue));
-							if ($sValue === $sUserAddressBookNameName)
-							{
-								$sNewPath = $sKey;
-								break;
-							}
-						}
-					}
-
-					if (empty($sNewPath))
-					{
-						foreach ($aPaths as $sKey => $sValue)
-						{
-							$sValue = \MailSo\Base\Utils::StrToLowerIfAscii($sValue);
-							if (\in_array($sValue, array('contacts', 'default', 'addressbook', 'address book')))
-							{
-								$sNewPath = $sKey;
-								break;
-							}
-						}
-					}
-				}
-
-				if (empty($sNewPath))
-				{
-					foreach ($aPaths as $sKey => $sValue)
-					{
-						$sNewPath = $sKey;
-						break;
-					}
-				}
-			}
-
-			$sPath = $sNewPath;
-
-			$bGood = $this->checkContactsPath($oClient, $sPath);
-		}
-
-		return $bGood ? $oClient : null;
-	}
-
 	public function Sync(string $sEmail, string $sUrl, string $sUser, string $sPassword, string $sProxy = '') : bool
 	{
 		$this->SyncDatabase();
@@ -620,7 +124,7 @@ class PdoAddressBook
 
 		$sPath = $oClient->__UrlPath__;
 
-		$aRemoteSyncData = $this->prepearRemoteSyncData($oClient, $sPath);
+		$aRemoteSyncData = $this->prepareDavSyncData($oClient, $sPath);
 		if (false === $aRemoteSyncData)
 		{
 			return false;
@@ -681,9 +185,9 @@ class PdoAddressBook
 					if (0 < \strlen($mExsistenRemoteID))
 					{
 						$oResponse = $this->davClientRequest($oClient, 'GET', $sPath.$mExsistenRemoteID);
-						if ($oResponse && isset($oResponse['headers'], $oResponse['body']))
+						if ($oResponse)
 						{
-							$sExsistensBody = \trim($oResponse['body']);
+							$sExsistensBody = \trim($oResponse->body);
 						}
 
 //						$this->oLogger->WriteDump($sExsistensBody);
@@ -692,11 +196,10 @@ class PdoAddressBook
 					$oResponse = $this->davClientRequest($oClient, 'PUT',
 						$sPath.(0 < \strlen($mExsistenRemoteID) ? $mExsistenRemoteID : $oContact->CardDavNameUri()),
 						$oContact->ToVCard($sExsistensBody, $this->oLogger)."\r\n\r\n");
-
-					if ($oResponse && isset($oResponse['headers'], $oResponse['headers']['etag']))
+					if ($oResponse)
 					{
-						$sEtag = \trim(\trim($oResponse['headers']['etag']), '"\'');
-						$sDate = !empty($oResponse['headers']['date']) ? \trim($oResponse['headers']['date']) : '';
+						$sEtag = \trim(\trim($oResponse->getHeader('etag')), '"\'');
+						$sDate = \trim($oResponse->getHeader('date'));
 						if (!empty($sEtag))
 						{
 							$iChanged = empty($sDate) ? \time() : \MailSo\Base\DateTimeHelper::ParseRFC2822DateString($sDate);
@@ -723,28 +226,56 @@ class PdoAddressBook
 					$aDatabaseSyncData[$sKey]['id_contact'] : '';
 
 				$oResponse = $this->davClientRequest($oClient, 'GET', $sPath.$aData['vcf']);
-				if ($oResponse && isset($oResponse['headers'], $oResponse['body']))
+				if ($oResponse)
 				{
-					$sBody = \trim($oResponse['body']);
+					$sBody = \trim($oResponse->body);
+
+					// Remove UTF-8 BOM
+					if ("\xef\xbb\xbf" === \substr($sBody, 0, 3))
+					{
+						$sBody = \substr($sBody, 3);
+					}
+
 					if (!empty($sBody))
 					{
-						$oContact = null;
-						if ($mExsistenContactID)
+						$oVCard = null;
+						try
 						{
-							$oContact = $this->GetContactByID($sEmail, $mExsistenContactID);
+							$oVCard = \Sabre\VObject\Reader::read($sBody);
+						}
+						catch (\Throwable $oExc)
+						{
+							if ($this->oLogger)
+							{
+								$this->oLogger->WriteException($oExc);
+								$this->oLogger->WriteDump($sBody);
+							}
 						}
 
-						if (!$oContact)
+						if ($oVCard instanceof \Sabre\VObject\Component\VCard)
 						{
-							$oContact = new \RainLoop\Providers\AddressBook\Classes\Contact();
+							$oVCard->UID = $aData['uid'];
+
+							$oContact = null;
+							if ($mExsistenContactID)
+							{
+								$oContact = $this->GetContactByID($sEmail, $mExsistenContactID);
+							}
+							if (!$oContact)
+							{
+								$oContact = new Classes\Contact();
+							}
+
+							$oContact->PopulateByVCard(
+								$oVCard,
+								\trim(\trim($oResponse->getHeader('etag')), '"\'')
+							);
+
+							$this->ContactSave($sEmail, $oContact);
+							unset($oContact);
+//						} else if ($this->oLogger) {
+//							$this->oLogger->WriteDump($sBody);
 						}
-
-						$oContact->PopulateByVCard($aData['uid'], $sBody,
-							!empty($oResponse['headers']['etag']) ? \trim(\trim($oResponse['headers']['etag']), '"\'') : '',
-							$this->oLogger);
-
-						$this->ContactSave($sEmail, $oContact);
-						unset($oContact);
 					}
 				}
 			}
@@ -793,7 +324,7 @@ class PdoAddressBook
 		return true;
 	}
 
-	public function ContactSave(string $sEmail, \RainLoop\Providers\AddressBook\Classes\Contact $oContact, bool $bSyncDb = true) : bool
+	public function ContactSave(string $sEmail, Classes\Contact $oContact, bool $bSyncDb = true) : bool
 	{
 		if ($bSyncDb)
 		{
@@ -867,7 +398,7 @@ class PdoAddressBook
 			if (0 < $iIdContact)
 			{
 				$aParams = array();
-				foreach ($oContact->Properties as /* @var $oProp \RainLoop\Providers\AddressBook\Classes\Property */ $oProp)
+				foreach ($oContact->Properties as /* @var $oProp Classes\Property */ $oProp)
 				{
 					$iFreq = $oProp->Frec;
 					if ($oProp->IsEmail() && isset($aFreq[$oProp->Value]))
@@ -915,10 +446,7 @@ class PdoAddressBook
 
 		$iUserID = $this->getUserId($sEmail);
 
-		$aContactIds = \array_filter($aContactIds, function (&$mItem) {
-			$mItem = (int) \trim($mItem);
-			return 0 < $mItem;
-		});
+		$aContactIds = \array_filter(\array_map('intval', $aContactIds));
 
 		if (0 === \count($aContactIds))
 		{
@@ -1080,7 +608,7 @@ class PdoAddressBook
 						if (0 < $iIdContact)
 						{
 							$aIdContacts[] = $iIdContact;
-							$oContact = new \RainLoop\Providers\AddressBook\Classes\Contact();
+							$oContact = new Classes\Contact();
 
 							$oContact->IdContact = (string) $iIdContact;
 							$oContact->IdContactStr = isset($aItem['id_contact_str']) ? (string) $aItem['id_contact_str'] : '';
@@ -1117,7 +645,7 @@ class PdoAddressBook
 									$iId = (int) $aItem['id_contact'];
 									if (0 < $iId && isset($aContacts[$iId]))
 									{
-										$oProperty = new \RainLoop\Providers\AddressBook\Classes\Property();
+										$oProperty = new Classes\Property();
 										$oProperty->IdProperty = (int) $aItem['id_prop'];
 										$oProperty->Type = (int) $aItem['prop_type'];
 										$oProperty->TypeStr = isset($aItem['prop_type_str']) ? (string) $aItem['prop_type_str'] : '';
@@ -1151,7 +679,7 @@ class PdoAddressBook
 	/**
 	 * @param mixed $mID
 	 */
-	public function GetContactByID(string $sEmail, $mID, bool $bIsStrID = false) : ?\RainLoop\Providers\AddressBook\Classes\Contact
+	public function GetContactByID(string $sEmail, $mID, bool $bIsStrID = false) : ?Classes\Contact
 	{
 		$mID = \trim($mID);
 
@@ -1191,7 +719,7 @@ class PdoAddressBook
 					$iIdContact = $aItem && isset($aItem['id_contact']) ? (int) $aItem['id_contact'] : 0;
 					if (0 < $iIdContact)
 					{
-						$oContact = new \RainLoop\Providers\AddressBook\Classes\Contact();
+						$oContact = new Classes\Contact();
 
 						$oContact->IdContact = (string) $iIdContact;
 						$oContact->IdContactStr = isset($aItem['id_contact_str']) ? (string) $aItem['id_contact_str'] : '';
@@ -1223,7 +751,7 @@ class PdoAddressBook
 							{
 								if ((string) $oContact->IdContact === (string) $aItem['id_contact'])
 								{
-									$oProperty = new \RainLoop\Providers\AddressBook\Classes\Property();
+									$oProperty = new Classes\Property();
 									$oProperty->IdProperty = (int) $aItem['id_prop'];
 									$oProperty->Type = (int) $aItem['prop_type'];
 									$oProperty->TypeStr = isset($aItem['prop_type_str']) ? (string) $aItem['prop_type_str'] : '';
@@ -1531,13 +1059,13 @@ class PdoAddressBook
 
 		if (0 < \count($aEmailsToCreate))
 		{
-			$oContact = new \RainLoop\Providers\AddressBook\Classes\Contact();
+			$oContact = new Classes\Contact();
 			foreach ($aEmailsToCreate as $oEmail)
 			{
 				if ('' !== \trim($oEmail->GetEmail()))
 				{
-					$oPropEmail = new \RainLoop\Providers\AddressBook\Classes\Property();
-					$oPropEmail->Type = \RainLoop\Providers\AddressBook\Enumerations\PropertyType::EMAIl;
+					$oPropEmail = new Classes\Property();
+					$oPropEmail->Type = Enumerations\PropertyType::EMAIl;
 					$oPropEmail->Value = \trim($oEmail->GetEmail(true));
 
 					$oContact->Properties[] = $oPropEmail;
@@ -1560,8 +1088,8 @@ class PdoAddressBook
 
 					if (0 < \strlen($sFirst))
 					{
-						$oPropName = new \RainLoop\Providers\AddressBook\Classes\Property();
-						$oPropName->Type = \RainLoop\Providers\AddressBook\Enumerations\PropertyType::FIRST_NAME;
+						$oPropName = new Classes\Property();
+						$oPropName->Type = Enumerations\PropertyType::FIRST_NAME;
 						$oPropName->Value = \trim($sFirst);
 
 						$oContact->Properties[] = $oPropName;
@@ -1569,8 +1097,8 @@ class PdoAddressBook
 
 					if (0 < \strlen($sLast))
 					{
-						$oPropName = new \RainLoop\Providers\AddressBook\Classes\Property();
-						$oPropName->Type = \RainLoop\Providers\AddressBook\Enumerations\PropertyType::LAST_NAME;
+						$oPropName = new Classes\Property();
+						$oPropName->Type = Enumerations\PropertyType::LAST_NAME;
 						$oPropName->Value = \trim($sLast);
 
 						$oContact->Properties[] = $oPropName;
@@ -1644,36 +1172,36 @@ class PdoAddressBook
 
 CREATE TABLE IF NOT EXISTS rainloop_ab_contacts (
 
-	id_contact		bigint UNSIGNED		NOT NULL AUTO_INCREMENT,
-	id_contact_str	varchar(128)		NOT NULL DEFAULT '',
-	id_user			int UNSIGNED		NOT NULL,
-	display			varchar(255)		NOT NULL DEFAULT '',
-	changed			int UNSIGNED		NOT NULL DEFAULT 0,
-	deleted			tinyint UNSIGNED	NOT NULL DEFAULT 0,
-	etag			varchar(128) /*!40101 CHARACTER SET ascii COLLATE ascii_general_ci */ NOT NULL DEFAULT '',
+	id_contact     bigint UNSIGNED  NOT NULL AUTO_INCREMENT,
+	id_contact_str varchar(128)     NOT NULL DEFAULT '',
+	id_user        int UNSIGNED     NOT NULL,
+	display        varchar(255)     NOT NULL DEFAULT '',
+	changed        int UNSIGNED     NOT NULL DEFAULT 0,
+	deleted        tinyint UNSIGNED NOT NULL DEFAULT 0,
+	etag           varchar(128)     CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL DEFAULT '',
 
 	PRIMARY KEY(id_contact),
 	INDEX id_user_rainloop_ab_contacts_index (id_user)
 
-)/*!40000 ENGINE=INNODB *//*!40101 CHARACTER SET utf8 COLLATE utf8_general_ci */;
+) ENGINE=INNODB CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS rainloop_ab_properties (
 
-	id_prop				bigint UNSIGNED		NOT NULL AUTO_INCREMENT,
-	id_contact			bigint UNSIGNED		NOT NULL,
-	id_user				int UNSIGNED		NOT NULL,
-	prop_type			tinyint UNSIGNED	NOT NULL,
-	prop_type_str		varchar(255) /*!40101 CHARACTER SET ascii COLLATE ascii_general_ci */ NOT NULL DEFAULT '',
-	prop_value			varchar(255)		NOT NULL DEFAULT '',
-	prop_value_custom	varchar(255)		NOT NULL DEFAULT '',
-	prop_frec			int UNSIGNED		NOT NULL DEFAULT 0,
+	id_prop           bigint UNSIGNED  NOT NULL AUTO_INCREMENT,
+	id_contact        bigint UNSIGNED  NOT NULL,
+	id_user           int UNSIGNED     NOT NULL,
+	prop_type         tinyint UNSIGNED NOT NULL,
+	prop_type_str     varchar(255)     CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL DEFAULT '',
+	prop_value        varchar(255)     NOT NULL DEFAULT '',
+	prop_value_custom varchar(255)     NOT NULL DEFAULT '',
+	prop_frec         int UNSIGNED     NOT NULL DEFAULT 0,
 
 	PRIMARY KEY(id_prop),
 	INDEX id_user_rainloop_ab_properties_index (id_user),
 	INDEX id_user_id_contact_rainloop_ab_properties_index (id_user, id_contact),
 	INDEX id_contact_prop_type_rainloop_ab_properties_index (id_contact, prop_type)
 
-)/*!40000 ENGINE=INNODB *//*!40101 CHARACTER SET utf8 COLLATE utf8_general_ci */;
+) ENGINE=INNODB CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 
 MYSQLINITIAL;
 				break;
@@ -1682,26 +1210,26 @@ MYSQLINITIAL;
 				$sInitial = <<<POSTGRESINITIAL
 
 CREATE TABLE rainloop_ab_contacts (
-	id_contact		bigserial		PRIMARY KEY,
-	id_contact_str	varchar(128)	NOT NULL DEFAULT '',
-	id_user			integer			NOT NULL,
-	display			varchar(255)	NOT NULL DEFAULT '',
-	changed			integer			NOT NULL default 0,
-	deleted			integer			NOT NULL default 0,
-	etag			varchar(128)	NOT NULL DEFAULT ''
+	id_contact     bigserial    PRIMARY KEY,
+	id_contact_str varchar(128) NOT NULL DEFAULT '',
+	id_user        integer      NOT NULL,
+	display        varchar(255) NOT NULL DEFAULT '',
+	changed        integer      NOT NULL default 0,
+	deleted        integer      NOT NULL default 0,
+	etag           varchar(128) NOT NULL DEFAULT ''
 );
 
 CREATE INDEX id_user_rainloop_ab_contacts_index ON rainloop_ab_contacts (id_user);
 
 CREATE TABLE rainloop_ab_properties (
-	id_prop				bigserial		PRIMARY KEY,
-	id_contact			integer			NOT NULL,
-	id_user				integer			NOT NULL,
-	prop_type			integer			NOT NULL,
-	prop_type_str		varchar(255)	NOT NULL DEFAULT '',
-	prop_value			text			NOT NULL DEFAULT '',
-	prop_value_custom	text			NOT NULL DEFAULT '',
-	prop_frec			integer			NOT NULL default 0
+	id_prop           bigserial    PRIMARY KEY,
+	id_contact        integer      NOT NULL,
+	id_user           integer      NOT NULL,
+	prop_type         integer      NOT NULL,
+	prop_type_str     varchar(255) NOT NULL DEFAULT '',
+	prop_value        text         NOT NULL DEFAULT '',
+	prop_value_custom text         NOT NULL DEFAULT '',
+	prop_frec         integer      NOT NULL default 0
 );
 
 CREATE INDEX id_user_rainloop_ab_properties_index ON rainloop_ab_properties (id_user);
@@ -1714,26 +1242,26 @@ POSTGRESINITIAL;
 				$sInitial = <<<SQLITEINITIAL
 
 CREATE TABLE rainloop_ab_contacts (
-	id_contact		integer		NOT NULL PRIMARY KEY,
-	id_contact_str	text		NOT NULL DEFAULT '',
-	id_user			integer		NOT NULL,
-	display			text		NOT NULL DEFAULT '',
-	changed			integer		NOT NULL DEFAULT 0,
-	deleted			integer		NOT NULL DEFAULT 0,
-	etag			text		NOT NULL DEFAULT ''
+	id_contact     integer NOT NULL PRIMARY KEY,
+	id_contact_str text    NOT NULL DEFAULT '',
+	id_user        integer NOT NULL,
+	display        text    NOT NULL DEFAULT '',
+	changed        integer NOT NULL DEFAULT 0,
+	deleted        integer NOT NULL DEFAULT 0,
+	etag           text    NOT NULL DEFAULT ''
 );
 
 CREATE INDEX id_user_rainloop_ab_contacts_index ON rainloop_ab_contacts (id_user);
 
 CREATE TABLE rainloop_ab_properties (
-	id_prop				integer		NOT NULL PRIMARY KEY,
-	id_contact			integer		NOT NULL,
-	id_user				integer		NOT NULL,
-	prop_type			integer		NOT NULL,
-	prop_type_str		text		NOT NULL DEFAULT '',
-	prop_value			text		NOT NULL DEFAULT '',
-	prop_value_custom	text		NOT NULL DEFAULT '',
-	prop_frec			integer		NOT NULL DEFAULT 0
+	id_prop           integer NOT NULL PRIMARY KEY,
+	id_contact        integer NOT NULL,
+	id_user           integer NOT NULL,
+	prop_type         integer NOT NULL,
+	prop_type_str     text    NOT NULL DEFAULT '',
+	prop_value        text    NOT NULL DEFAULT '',
+	prop_value_custom text    NOT NULL DEFAULT '',
+	prop_frec         integer NOT NULL DEFAULT 0
 );
 
 CREATE INDEX id_user_rainloop_ab_properties_index ON rainloop_ab_properties (id_user);

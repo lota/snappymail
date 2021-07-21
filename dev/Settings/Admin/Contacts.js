@@ -19,7 +19,7 @@ export class ContactsAdminSettings {
 		addObservablesTo(this, {
 			enableContacts: !!SettingsGet('ContactsEnable'),
 			contactsSync: !!SettingsGet('ContactsSync'),
-			contactsType: '',
+			contactsType: SettingsGet('ContactsPdoType'),
 
 			pdoDsn: SettingsGet('ContactsPdoDsn'),
 			pdoUser: SettingsGet('ContactsPdoUser'),
@@ -69,8 +69,6 @@ export class ContactsAdminSettings {
 			})
 			.extend({ notify: 'always' });
 
-		this.contactsType(SettingsGet('ContactsPdoType'));
-
 		addSubscribablesTo(this, {
 			enableContacts: value =>
 				Remote.saveAdminConfig(null, {
@@ -107,8 +105,6 @@ export class ContactsAdminSettings {
 				})
 		})
 
-		this.onTestContactsResponse = this.onTestContactsResponse.bind(this);
-
 		decorateKoCommands(this, {
 			testContactsCommand: self => self.pdoDsn() && self.pdoUser()
 		});
@@ -120,31 +116,29 @@ export class ContactsAdminSettings {
 		this.testContactsErrorMessage('');
 		this.testing(true);
 
-		Remote.testContacts(this.onTestContactsResponse, {
+		Remote.testContacts((iError, data) => {
+			this.testContactsSuccess(false);
+			this.testContactsError(false);
+			this.testContactsErrorMessage('');
+
+			if (!iError && data.Result.Result) {
+				this.testContactsSuccess(true);
+			} else {
+				this.testContactsError(true);
+				if (data && data.Result) {
+					this.testContactsErrorMessage(data.Result.Message || '');
+				} else {
+					this.testContactsErrorMessage('');
+				}
+			}
+
+			this.testing(false);
+		}, {
 			ContactsPdoType: this.contactsType(),
 			ContactsPdoDsn: this.pdoDsn(),
 			ContactsPdoUser: this.pdoUser(),
 			ContactsPdoPassword: this.pdoPassword()
 		});
-	}
-
-	onTestContactsResponse(iError, data) {
-		this.testContactsSuccess(false);
-		this.testContactsError(false);
-		this.testContactsErrorMessage('');
-
-		if (!iError && data.Result.Result) {
-			this.testContactsSuccess(true);
-		} else {
-			this.testContactsError(true);
-			if (data && data.Result) {
-				this.testContactsErrorMessage(data.Result.Message || '');
-			} else {
-				this.testContactsErrorMessage('');
-			}
-		}
-
-		this.testing(false);
 	}
 
 	onShow() {
