@@ -4,14 +4,10 @@
  * License: MIT (http://www.opensource.org/licenses/mit-license.php)
  */
 
-(()=>{
-var DEBUG=true;
 (window => {
     // (0, eval)('this') is a robust way of getting a reference to the global object
     // For details, see http://stackoverflow.com/questions/14119988/return-this-0-evalthis/14120023#14120023
     var document = window['document'],
-        navigator = window['navigator'],
-        JSON = window["JSON"],
         koExports = {};
 // Internally, all KO objects are attached to koExports (even the non-exported ones whose names will be minified by the closure compiler).
 // In the future, the following "ko" variable may be made distinct from "koExports" so that private objects are not externally reachable.
@@ -22,49 +18,20 @@ ko.exportSymbol = (koPath, object) => {
 
     // In the future, "ko" may become distinct from "koExports" (so that non-exported objects are not reachable)
     // At that point, "target" would be set to: (typeof koExports !== "undefined" ? koExports : ko)
-    var target = ko;
+    var target = ko, i = 0, l = tokens.length - 1;
 
-    for (var i = 0; i < tokens.length - 1; i++)
+    for (; i < l; i++)
         target = target[tokens[i]];
-    target[tokens[tokens.length - 1]] = object;
+    target[tokens[l]] = object;
 };
 ko.exportProperty = (owner, publicName, object) => owner[publicName] = object;
-ko.version = "3.5.1-sm";
-
-ko.exportSymbol('version', ko.version);
+ko.exportSymbol('version', "3.5.1-sm");
 ko.utils = {
-    arrayRemoveItem: (array, itemToRemove) => {
-        var index = array.indexOf(itemToRemove);
-        if (index > 0) {
-            array.splice(index, 1);
-        }
-        else if (index === 0) {
-            array.shift();
-        }
-    },
-
-    extend: (target, source) => {
-        source && Object.entries(source).forEach(prop => target[prop[0]] = prop[1]);
-        return target;
-    },
+    extend: (target, source) => source ? Object.assign(target, source) : target,
 
     objectForEach: (obj, action) => obj && Object.entries(obj).forEach(prop => action(prop[0], prop[1])),
 
-    objectMap: (source, mapping, mappingOwner) => {
-        if (!source)
-            return source;
-        var target = {};
-        Object.entries(source).forEach(prop =>
-            target[prop[0]] = mapping.call(mappingOwner, prop[1], prop[0], source)
-        );
-        return target;
-    },
-
-    emptyDomNode: domNode => {
-        while (domNode.firstChild) {
-            ko.removeNode(domNode.firstChild);
-        }
-    },
+    emptyDomNode: domNode => [...domNode.childNodes].forEach(child => ko.removeNode(child)),
 
     moveCleanedNodesToContainerElement: nodes => {
         // Ensure it's a real array, as we're about to reparent the nodes and
@@ -73,7 +40,7 @@ ko.utils = {
         var templateDocument = (nodesArray[0] && nodesArray[0].ownerDocument) || document;
 
         var container = templateDocument.createElement('div');
-        nodes.forEach(node => container.append(ko.cleanNode(node)));
+        nodesArray.forEach(node => container.append(ko.cleanNode(node)));
         return container;
     },
 
@@ -115,7 +82,7 @@ ko.utils = {
             // Rule [B]
             while (continuousNodeArray.length > 1
                 && continuousNodeArray[continuousNodeArray.length - 1].parentNode !== parentNode)
-                continuousNodeArray.length--;
+                --continuousNodeArray.length;
 
             // Rule [C]
             if (continuousNodeArray.length > 1) {
@@ -137,41 +104,8 @@ ko.utils = {
                 string.trim() :
                 string.toString().replace(/^[\s\xa0]+|[\s\xa0]+$/g, ''),
 
-    stringStartsWith: (string, startsWith) => {
-        string = string || "";
-        if (startsWith.length > string.length)
-            return false;
-        return string.substring(0, startsWith.length) === startsWith;
-    },
-
-    domNodeIsContainedBy: (node, containedByNode) =>
-        containedByNode.contains(node.nodeType !== 1 ? node.parentNode : node),
-
-    domNodeIsAttachedToDocument: node => ko.utils.domNodeIsContainedBy(node, node.ownerDocument.documentElement),
-
-    catchFunctionErrors: delegate => {
-        return ko['onError'] ? function () {
-            try {
-                return delegate.apply(this, arguments);
-            } catch (e) {
-                ko['onError'] && ko['onError'](e);
-                throw e;
-            }
-        } : delegate;
-    },
-
-    setTimeout: (handler, timeout) => setTimeout(ko.utils.catchFunctionErrors(handler), timeout),
-
-    deferError: error => setTimeout(() => {
-            ko['onError'] && ko['onError'](error);
-            throw error;
-        }, 0),
-
-    registerEventHandler: (element, eventType, handler) => {
-        var wrappedHandler = ko.utils.catchFunctionErrors(handler);
-
-        element.addEventListener(eventType, wrappedHandler, false);
-    },
+    domNodeIsAttachedToDocument: node =>
+        node.ownerDocument.documentElement.contains(node.nodeType !== 1 ? node.parentNode : node),
 
     triggerEvent: (element, eventType) => {
         if (!(element && element.nodeType))
@@ -188,58 +122,56 @@ ko.utils = {
 
 ko.exportSymbol('utils', ko.utils);
 ko.exportSymbol('unwrap', ko.utils.unwrapObservable); // Convenient shorthand, because this is used so commonly
+(() => {
 
-ko.utils.domData = new (function () {
-    let uniqueId = 0,
-        dataStoreKeyExpandoPropertyName = "__ko__" + (Date.now()),
-        dataStore = new WeakMap();
+let uniqueId = 0,
+    dataStoreKeyExpandoPropertyName = "__ko__" + (Date.now()),
+    dataStore = new WeakMap();
 
-    return {
-        get: (node, key) => (dataStore.get(node) || {})[key],
-        set: (node, key, value) => {
-            if (dataStore.has(node)) {
-                dataStore.get(node)[key] = value;
-            } else {
-                let dataForNode = {};
-                dataForNode[key] = value;
-                dataStore.set(node, dataForNode);
-            }
-            return value;
-        },
-        getOrSet: function(node, key, value) {
-            return this.get(node, key) || this.set(node, key, value);
-        },
-        clear: node => dataStore.delete(node),
+ko.utils.domData = {
+    get: (node, key) => (dataStore.get(node) || {})[key],
+    set: (node, key, value) => {
+        if (dataStore.has(node)) {
+            dataStore.get(node)[key] = value;
+        } else {
+            let dataForNode = {};
+            dataForNode[key] = value;
+            dataStore.set(node, dataForNode);
+        }
+        return value;
+    },
+    getOrSet: function(node, key, value) {
+        return this.get(node, key) || this.set(node, key, value);
+    },
+    clear: node => dataStore.delete(node),
 
-        nextKey: () => (uniqueId++) + dataStoreKeyExpandoPropertyName
-    };
+    nextKey: () => (uniqueId++) + dataStoreKeyExpandoPropertyName
+};
+
 })();
 
 ko.utils.domNodeDisposal = (() => {
     var domDataKey = ko.utils.domData.nextKey();
-    var cleanableNodeTypes = { 1: true, 8: true, 9: true };       // Element, Comment, Document
-    var cleanableNodeTypesWithDescendants = { 1: true, 9: true }; // Element, Document
+    var cleanableNodeTypes = { 1: 1, 8: 1, 9: 1 };       // Element, Comment, Document
+    var cleanableNodeTypesWithDescendants = { 1: 1, 9: 1 }; // Element, Document
 
     const getDisposeCallbacksCollection = (node, createIfNotFound) => {
         var allDisposeCallbacks = ko.utils.domData.get(node, domDataKey);
-        if ((allDisposeCallbacks === undefined) && createIfNotFound) {
-            allDisposeCallbacks = [];
+        if (createIfNotFound && !allDisposeCallbacks) {
+            allDisposeCallbacks = new Set;
             ko.utils.domData.set(node, domDataKey, allDisposeCallbacks);
         }
         return allDisposeCallbacks;
     },
 
-    destroyCallbacksCollection = node => {
-        ko.utils.domData.set(node, domDataKey, undefined);
-    },
+    destroyCallbacksCollection = node => ko.utils.domData.set(node, domDataKey, null),
 
     cleanSingleNode = node => {
         // Run all the dispose callbacks
-        var callbacks = getDisposeCallbacksCollection(node, false);
+        var callbacks = getDisposeCallbacksCollection(node);
         if (callbacks) {
-            callbacks = callbacks.slice(0); // Clone, as the array may be modified during iteration (typically, callbacks will remove themselves)
-            for (var i = 0; i < callbacks.length; i++)
-                callbacks[i](node);
+            // Clone, as the array may be modified during iteration (typically, callbacks will remove themselves)
+            (new Set(callbacks)).forEach(callback => callback(node));
         }
 
         // Erase the DOM data
@@ -267,14 +199,14 @@ ko.utils.domNodeDisposal = (() => {
         addDisposeCallback : (node, callback) => {
             if (typeof callback != "function")
                 throw new Error("Callback must be a function");
-            getDisposeCallbacksCollection(node, true).push(callback);
+            getDisposeCallbacksCollection(node, 1).add(callback);
         },
 
         removeDisposeCallback : (node, callback) => {
-            var callbacksCollection = getDisposeCallbacksCollection(node, false);
+            var callbacksCollection = getDisposeCallbacksCollection(node);
             if (callbacksCollection) {
-                ko.utils.arrayRemoveItem(callbacksCollection, callback);
-                callbacksCollection.length || destroyCallbacksCollection(node);
+                callbacksCollection.delete(callback);
+                callbacksCollection.size || destroyCallbacksCollection(node);
             }
         },
 
@@ -329,7 +261,9 @@ ko.tasks = (() => {
                     if (nextIndexToProcess > mark) {
                         if (++countMarks >= 5000) {
                             nextIndexToProcess = taskQueueLength;   // skip all tasks remaining in the queue since any of them could be causing the recursion
-                            ko.utils.deferError(Error("'Too much recursion' after processing " + countMarks + " task groups."));
+                            setTimeout(() => {
+                                throw Error(`'Too much recursion' after processing ${countMarks} task groups.`)
+                            }, 0)
                             break;
                         }
                         mark = taskQueueLength;
@@ -337,7 +271,7 @@ ko.tasks = (() => {
                     try {
                         task();
                     } catch (ex) {
-                        ko.utils.deferError(ex);
+                        setTimeout(() => { throw ex }, 0);
                     }
                 }
             }
@@ -371,8 +305,6 @@ ko.tasks = (() => {
 
     return tasks;
 })();
-
-ko.exportSymbol('tasks', ko.tasks);
 ko.extenders = {
     'debounce': (target, timeout) => target.limit(callback => debounce(callback, timeout)),
 
@@ -406,7 +338,7 @@ function throttle(callback, timeout) {
     var timeoutInstance;
     return () => {
         if (!timeoutInstance) {
-            timeoutInstance = ko.utils.setTimeout(() => {
+            timeoutInstance = setTimeout(() => {
                 timeoutInstance = 0;
                 callback();
             }, timeout);
@@ -418,7 +350,7 @@ function debounce(callback, timeout) {
     var timeoutInstance;
     return () => {
         clearTimeout(timeoutInstance);
-        timeoutInstance = ko.utils.setTimeout(callback, timeout);
+        timeoutInstance = setTimeout(callback, timeout);
     };
 }
 
@@ -434,7 +366,6 @@ class koSubscription
         this._node = null;
         this._domNodeDisposalCallback = null;
         ko.exportProperty(this, 'dispose', this.dispose);
-        ko.exportProperty(this, 'disposeWhenNodeIsRemoved', this.disposeWhenNodeIsRemoved);
     }
 
     dispose() {
@@ -466,7 +397,8 @@ var defaultEvent = "change";
 
 var ko_subscribable_fn = {
     init: instance => {
-        instance._subscriptions = { "change": [] };
+        instance._subscriptions = new Map();
+        instance._subscriptions.set("change", new Set);
         instance._versionNumber = 1;
     },
 
@@ -477,7 +409,7 @@ var ko_subscribable_fn = {
         var boundCallback = callbackTarget ? callback.bind(callbackTarget) : callback;
 
         var subscription = new koSubscription(self, boundCallback, () => {
-            ko.utils.arrayRemoveItem(self._subscriptions[event], subscription);
+            self._subscriptions.get(event).delete(subscription);
             if (self.afterSubscriptionRemove)
                 self.afterSubscriptionRemove(event);
         });
@@ -485,9 +417,9 @@ var ko_subscribable_fn = {
         if (self.beforeSubscriptionAdd)
             self.beforeSubscriptionAdd(event);
 
-        if (!self._subscriptions[event])
-            self._subscriptions[event] = [];
-        self._subscriptions[event].push(subscription);
+        if (!self._subscriptions.has(event))
+            self._subscriptions.set(event, new Set);
+        self._subscriptions.get(event).add(subscription);
 
         return subscription;
     },
@@ -498,16 +430,14 @@ var ko_subscribable_fn = {
             this.updateVersion();
         }
         if (this.hasSubscriptionsForEvent(event)) {
-            var subs = event === defaultEvent && this._changeSubscriptions || this._subscriptions[event].slice(0);
+            var subs = event === defaultEvent && this._changeSubscriptions || new Set(this._subscriptions.get(event));
             try {
                 ko.dependencyDetection.begin(); // Begin suppressing dependency detection (by setting the top frame to undefined)
-                var i = 0, subscription;
-                while ((subscription = subs[i++])) {
+                subs.forEach(subscription => {
                     // In case a subscription was disposed during the arrayForEach cycle, check
                     // for isDisposed on each subscription before invoking its callback
-                    if (!subscription._isDisposed)
-                        subscription._callback(valueToNotify);
-                }
+                    subscription._isDisposed || subscription._callback(valueToNotify);
+                });
             } finally {
                 ko.dependencyDetection.end(); // End suppressing dependency detection
             }
@@ -566,7 +496,7 @@ var ko_subscribable_fn = {
             if (!isDirty || !self._notificationIsPending) {
                 didUpdate = !isDirty;
             }
-            self._changeSubscriptions = self._subscriptions[defaultEvent].slice(0);
+            self._changeSubscriptions = new Set(self._subscriptions.get(defaultEvent));
             self._notificationIsPending = ignoreBeforeChange = true;
             pendingValue = value;
             finish();
@@ -588,7 +518,7 @@ var ko_subscribable_fn = {
     },
 
     hasSubscriptionsForEvent: function(event) {
-        return this._subscriptions[event] && this._subscriptions[event].length;
+        return (this._subscriptions.get(event) || []).size;
     },
 
     isDifferent: function(oldValue, newValue) {
@@ -625,57 +555,52 @@ ko.subscribable['fn'] = ko_subscribable_fn;
 
 ko.isSubscribable = instance =>
     instance != null && typeof instance.subscribe == "function" && typeof instance["notifySubscribers"] == "function";
+(() => {
 
-ko.dependencyDetection = (() => {
-    var outerFrames = [],
-        currentFrame,
-        lastId = 0,
+var outerFrames = [],
+    currentFrame,
+    lastId = 0,
 
-        begin = options => {
-            outerFrames.push(currentFrame);
-            currentFrame = options;
-        },
+    begin = options => {
+        outerFrames.push(currentFrame);
+        currentFrame = options;
+    },
 
-        end = () => currentFrame = outerFrames.pop();
+    end = () => currentFrame = outerFrames.pop();
 
-    return {
-        begin: begin,
+ko.dependencyDetection = {
+    begin: begin,
 
-        end: end,
+    end: end,
 
-        registerDependency: subscribable => {
-            if (currentFrame) {
-                if (!ko.isSubscribable(subscribable))
-                    throw new Error("Only subscribable things can act as dependencies");
-                currentFrame.callback.call(currentFrame.callbackTarget, subscribable,
-                    subscribable._id || (subscribable._id = ++lastId));
-            }
-        },
-
-        ignore: (callback, callbackTarget, callbackArgs) => {
-            try {
-                begin();
-                return callback.apply(callbackTarget, callbackArgs || []);
-            } finally {
-                end();
-            }
-        },
-
-        getDependenciesCount: () => {
-            return currentFrame && currentFrame.computed.getDependenciesCount();
-        },
-
-        isInitial: () => {
-            return currentFrame && currentFrame.isInitial;
-        },
-
-        computed: () => {
-            return currentFrame && currentFrame.computed;
+    registerDependency: subscribable => {
+        if (currentFrame) {
+            if (!ko.isSubscribable(subscribable))
+                throw new Error("Only subscribable things can act as dependencies");
+            currentFrame.callback.call(currentFrame.callbackTarget, subscribable,
+                subscribable._id || (subscribable._id = ++lastId));
         }
-    };
+    },
+
+    ignore: (callback, callbackTarget, callbackArgs) => {
+        try {
+            begin();
+            return callback.apply(callbackTarget, callbackArgs || []);
+        } finally {
+            end();
+        }
+    },
+
+    getDependenciesCount: () => currentFrame && currentFrame.computed.getDependenciesCount(),
+
+    isInitial: () => currentFrame && currentFrame.isInitial,
+
+    computed: () => currentFrame && currentFrame.computed
+};
+
 })();
 const observableLatestValue = Symbol('_latestValue'),
-	length = 'length';
+    length = 'length';
 
 ko.observable = initialValue => {
     function observable() {
@@ -766,26 +691,22 @@ ko.observableArray = initialValues => {
 ko.observableArray['fn'] = {
     'remove': function (valueOrPredicate) {
         var underlyingArray = this.peek();
-        var removedValues = [];
-        var predicate = typeof valueOrPredicate == "function" && !ko.isObservable(valueOrPredicate) ? valueOrPredicate : function (value) { return value === valueOrPredicate; };
+        var removed = false;
+        var predicate = typeof valueOrPredicate == "function" && !ko.isObservable(valueOrPredicate)
+            ? valueOrPredicate : value => value === valueOrPredicate;
         var i = underlyingArray.length;
         while (i--) {
             var value = underlyingArray[i];
             if (predicate(value)) {
-                if (removedValues.length === 0) {
-                    this.valueWillMutate();
-                }
                 if (underlyingArray[i] !== value) {
                     throw Error("Array modified during remove; cannot remove item");
                 }
-                removedValues.push(value);
+                removed || this.valueWillMutate();
+                removed = true;
                 underlyingArray.splice(i, 1);
             }
         }
-        if (removedValues.length) {
-            this.valueHasMutated();
-        }
-        return removedValues;
+        removed && this.valueHasMutated();
     }
 };
 
@@ -950,7 +871,7 @@ ko.extenders['trackArrayChanges'] = (target, options) => {
             case 'push':
                 offset = arrayLength;
             case 'unshift':
-                for (var index = 0; index < argsLength; index++) {
+                for (let index = 0; index < argsLength; index++) {
                     pushDiff('added', args[index], offset + index);
                 }
                 break;
@@ -971,7 +892,7 @@ ko.extenders['trackArrayChanges'] = (target, options) => {
                     endAddIndex = startIndex + argsLength - 2,
                     endIndex = Math.max(endDeleteIndex, endAddIndex),
                     additions = [], deletions = [];
-                for (var index = startIndex, argsIndex = 2; index < endIndex; ++index, ++argsIndex) {
+                for (let index = startIndex, argsIndex = 2; index < endIndex; ++index, ++argsIndex) {
                     if (index < endDeleteIndex)
                         deletions.push(pushDiff('deleted', rawArray[index], index));
                     if (index < endAddIndex)
@@ -1023,18 +944,15 @@ ko.computed = (evaluatorFunctionOrOptions, options) => {
 
     function computedObservable() {
         if (arguments.length > 0) {
-            if (typeof writeFunction === "function") {
-                // Writing a value
-                writeFunction(...arguments);
-            } else {
+            if (typeof writeFunction !== "function") {
                 throw new Error("Cannot write a value to a ko.computed unless you specify a 'write' option. If you wish to read the current value, don't pass any parameters.");
             }
+            // Writing a value
+            writeFunction(...arguments);
             return this; // Permits chained assignments
         } else {
             // Reading the value
-            if (!state.isDisposed) {
-                ko.dependencyDetection.registerDependency(computedObservable);
-            }
+            state.isDisposed || ko.dependencyDetection.registerDependency(computedObservable);
             if (state.isDirty || (state.isSleeping && computedObservable.haveDependenciesChanged())) {
                 computedObservable.evaluateImmediate();
             }
@@ -1120,23 +1038,23 @@ function computedBeginDependencyDetectionCallback(subscribable, id) {
 }
 
 function evaluateImmediate_CallReadThenEndDependencyDetection(state, dependencyDetectionContext) {
-	// This function is really part of the evaluateImmediate_CallReadWithDependencyDetection logic.
-	// You'd never call it from anywhere else. Factoring it out means that evaluateImmediate_CallReadWithDependencyDetection
-	// can be independent of try/finally blocks, which contributes to saving about 40% off the CPU
-	// overhead of computed evaluation (on V8 at least).
+    // This function is really part of the evaluateImmediate_CallReadWithDependencyDetection logic.
+    // You'd never call it from anywhere else. Factoring it out means that evaluateImmediate_CallReadWithDependencyDetection
+    // can be independent of try/finally blocks, which contributes to saving about 40% off the CPU
+    // overhead of computed evaluation (on V8 at least).
 
-	try {
-		return state.readFunction();
-	} finally {
-		ko.dependencyDetection.end();
+    try {
+        return state.readFunction();
+    } finally {
+        ko.dependencyDetection.end();
 
-		// For each subscription no longer being used, remove it from the active subscriptions list and dispose it
-		if (dependencyDetectionContext.disposalCount && !state.isSleeping) {
-			ko.utils.objectForEach(dependencyDetectionContext.disposalCandidates, computedDisposeDependencyCallback);
-		}
+        // For each subscription no longer being used, remove it from the active subscriptions list and dispose it
+        if (dependencyDetectionContext.disposalCount && !state.isSleeping) {
+            ko.utils.objectForEach(dependencyDetectionContext.disposalCandidates, computedDisposeDependencyCallback);
+        }
 
-		state.isStale = state.isDirty = false;
-	}
+        state.isStale = state.isDirty = false;
+    }
 }
 
 var computedFn = {
@@ -1158,12 +1076,8 @@ var computedFn = {
             return false;
         }
         var dependencies = this.getDependencies();
-        if (dependencies.includes(obs)) {
-            return true;
-        }
-        return !!dependencies.find(dep =>
-            dep.hasAncestorDependency && dep.hasAncestorDependency(obs)
-        );
+        return dependencies.includes(obs)
+            || !!dependencies.find(dep => dep.hasAncestorDependency && dep.hasAncestorDependency(obs));
     },
     addDependencyTracking: function (id, target, trackingObj) {
         if (this[computedState].pure && target === this) {
@@ -1211,7 +1125,7 @@ var computedFn = {
             throttleEvaluationTimeout = computedObservable['throttleEvaluation'];
         if (throttleEvaluationTimeout && throttleEvaluationTimeout >= 0) {
             clearTimeout(this[computedState].evaluationTimeoutInstance);
-            this[computedState].evaluationTimeoutInstance = ko.utils.setTimeout(() =>
+            this[computedState].evaluationTimeoutInstance = setTimeout(() =>
                 computedObservable.evaluateImmediate(true /*notifyChange*/)
             , throttleEvaluationTimeout);
         } else if (computedObservable._evalDelayed) {
@@ -1473,7 +1387,7 @@ ko.pureComputed = (evaluatorFunctionOrOptions) => {
     if (typeof evaluatorFunctionOrOptions === 'function') {
         return ko.computed(evaluatorFunctionOrOptions, {'pure':true});
     }
-    evaluatorFunctionOrOptions = ko.utils.extend({}, evaluatorFunctionOrOptions);   // make a copy of the parameter object
+    evaluatorFunctionOrOptions = { ...evaluatorFunctionOrOptions };   // make a copy of the parameter object
     evaluatorFunctionOrOptions['pure'] = true;
     return ko.computed(evaluatorFunctionOrOptions);
 };
@@ -1596,7 +1510,8 @@ ko.expressionRewriting = (() => {
         var result = [], toks = str.match(bindingToken), key, values = [], depth = 0;
 
         if (toks.length > 1) {
-            for (var i = 0, tok; tok = toks[i]; ++i) {
+            var i = 0, tok;
+            while ((tok = toks[i++])) {
                 var c = tok.charCodeAt(0);
                 // A comma signals the end of a key/value pair if depth is zero
                 if (c === 44) { // ","
@@ -1646,7 +1561,7 @@ ko.expressionRewriting = (() => {
     }
 
     // Two-way bindings include a write function that allow the handler to update the value even if it's not an observable.
-    var twoWayBindings = {};
+    var twoWayBindings = new Set;
 
     function preProcessBindings(bindingsStringOrKeyValueArray, bindingOptions) {
         bindingOptions = bindingOptions || {};
@@ -1657,14 +1572,13 @@ ko.expressionRewriting = (() => {
                 return (obj && obj['preprocess']) ? (val = obj['preprocess'](val, key, processKeyValue)) : true;
             }
             if (!bindingParams) {
-                if (!callPreprocessHook(ko['getBindingHandler'](key)))
+                if (!callPreprocessHook(ko.bindingHandlers[key]))
                     return;
 
-                if (twoWayBindings[key] && (writableVal = getWriteableValue(val))) {
+                if (twoWayBindings.has(key) && (writableVal = getWriteableValue(val))) {
                     // For two-way bindings, provide a write method in case the value
                     // isn't a writable observable.
-                    var writeKey = typeof twoWayBindings[key] == 'string' ? twoWayBindings[key] : key;
-                    propertyAccessorResultStrings.push("'" + writeKey + "':function(_z){" + writableVal + "=_z}");
+                    propertyAccessorResultStrings.push("'" + key + "':function(_z){" + writableVal + "=_z}");
                 }
             }
             // Values are wrapped in a function so that each value can be accessed independently
@@ -1756,15 +1670,14 @@ ko.expressionRewriting = (() => {
         while (currentNode = currentNode.nextSibling) {
             if (isEndComment(currentNode)) {
                 ko.utils.domData.set(currentNode, matchedEndCommentDataKey, true);
-                depth--;
-                if (depth === 0)
+                if (!--depth)
                     return children;
             }
 
             children.push(currentNode);
 
             if (isStartComment(currentNode))
-                depth++;
+                ++depth;
         }
         if (!allowUnbalanced)
             throw new Error("Cannot find closing comment tag to match: " + startComment.nodeValue);
@@ -1774,9 +1687,9 @@ ko.expressionRewriting = (() => {
     function getMatchingEndComment(startComment, allowUnbalanced) {
         var allVirtualChildren = getVirtualChildren(startComment, allowUnbalanced);
         if (allVirtualChildren) {
-            if (allVirtualChildren.length > 0)
-                return allVirtualChildren[allVirtualChildren.length - 1].nextSibling;
-            return startComment.nextSibling;
+            return (allVirtualChildren.length
+                ? allVirtualChildren[allVirtualChildren.length - 1]
+                : startComment).nextSibling;
         }
         return null; // Must have no matching end comment, and allowUnbalanced is true
     }
@@ -1789,8 +1702,7 @@ ko.expressionRewriting = (() => {
         emptyNode: node => {
             if (isStartComment(node)) {
                 var virtualChildren = getVirtualChildren(node);
-                for (var i = 0, j = virtualChildren.length; i < j; i++)
-                    ko.removeNode(virtualChildren[i]);
+                virtualChildren && [...virtualChildren].forEach(child => ko.removeNode(child));
             } else
                 ko.utils.emptyDomNode(node);
         },
@@ -1798,64 +1710,48 @@ ko.expressionRewriting = (() => {
         setDomNodeChildren: (node, childNodes) => {
             if (isStartComment(node)) {
                 ko.virtualElements.emptyNode(node);
-                var endCommentNode = node.nextSibling; // Must be the next sibling, as we just emptied the children
-                for (var i = 0, j = childNodes.length; i < j; i++)
-                    endCommentNode.parentNode.insertBefore(childNodes[i], endCommentNode);
+                node.after(...childNodes);
             } else
                 ko.utils.setDomNodeChildren(node, childNodes);
         },
 
         prepend: (containerNode, nodeToPrepend) => {
-            var insertBeforeNode;
-
-            if (isStartComment(containerNode)) {
-                // Start comments must always have a parent and at least one following sibling (the end comment)
-                insertBeforeNode = containerNode.nextSibling;
-                containerNode = containerNode.parentNode;
-            } else {
-                insertBeforeNode = containerNode.firstChild;
-            }
-
-            containerNode.insertBefore(nodeToPrepend, insertBeforeNode);
+            // Start comments must always have a parent and at least one following sibling (the end comment)
+            isStartComment(containerNode)
+                ? containerNode.nextSibling.before(nodeToPrepend)
+                : containerNode.prepend(nodeToPrepend);
         },
 
         insertAfter: (containerNode, nodeToInsert, insertAfterNode) => {
-            if (insertAfterNode) {
-                // Children of start comments must always have a parent and at least one following sibling (the end comment)
-                var insertBeforeNode = insertAfterNode.nextSibling;
-
-                if (isStartComment(containerNode)) {
-                    containerNode = containerNode.parentNode;
-                }
-
-                containerNode.insertBefore(nodeToInsert, insertBeforeNode);
-            } else {
-                ko.virtualElements.prepend(containerNode, nodeToInsert);
-            }
+            insertAfterNode
+                ? insertAfterNode.after(nodeToInsert)
+                : ko.virtualElements.prepend(containerNode, nodeToInsert);
         },
 
         firstChild: node => {
             if (isStartComment(node)) {
-                return (!node.nextSibling || isEndComment(node.nextSibling)) ? null : node.nextSibling;
+                let next = node.nextSibling;
+                return (!next || isEndComment(next)) ? null : next;
             }
-            if (node.firstChild && isEndComment(node.firstChild)) {
+            let first = node.firstChild;
+            if (first && isEndComment(first)) {
                 throw new Error("Found invalid end comment, as the first child of " + node);
             }
-            return node.firstChild;
+            return first;
         },
 
         nextSibling: node => {
             if (isStartComment(node)) {
                 node = getMatchingEndComment(node);
             }
-
-            if (node.nextSibling && isEndComment(node.nextSibling)) {
-                if (isUnmatchedEndComment(node.nextSibling)) {
+            let next = node.nextSibling;
+            if (next && isEndComment(next)) {
+                if (isUnmatchedEndComment(next)) {
                     throw Error("Found end comment without a matching opening comment, as child of " + node);
                 }
                 return null;
             }
-            return node.nextSibling;
+            return next;
         },
 
         hasBindingValue: isStartComment,
@@ -1869,22 +1765,7 @@ ko.expressionRewriting = (() => {
 (() => {
     const defaultBindingAttributeName = "data-bind",
 
-        bindingCache = {},
-
-        createBindingsStringEvaluatorViaCache = (bindingsString, cache, options) => {
-            var cacheKey = bindingsString + (options && options['valueAccessors'] || '');
-            return cache[cacheKey]
-                || (cache[cacheKey] = createBindingsStringEvaluator(bindingsString, options));
-        },
-
-        createBindingsStringEvaluator = (bindingsString, options) => {
-            // Build the source for a function that evaluates "expression"
-            // For each scope variable, add an extra level of "with" nesting
-            // Example result: with(sc1) { with(sc0) { return (expression) } }
-            var rewrittenBindings = ko.expressionRewriting.preProcessBindings(bindingsString, options),
-                functionBody = "with($context){with($data||{}){return{" + rewrittenBindings + "}}}";
-            return new Function("$context", "$element", functionBody);
-        },
+        bindingCache = new Map,
 
         // The following function is only used internally by this default provider.
         // It's not part of the interface definition for a general binding provider.
@@ -1894,18 +1775,6 @@ ko.expressionRewriting = (() => {
                 case 8: return ko.virtualElements.virtualNodeBindingValue(node); // Comment node
             }
             return null;
-        },
-
-        // The following function is only used internally by this default provider.
-        // It's not part of the interface definition for a general binding provider.
-        parseBindingsString = (bindingsString, bindingContext, node, options) => {
-            try {
-                var bindingFunction = createBindingsStringEvaluatorViaCache(bindingsString, bindingCache, options);
-                return bindingFunction(bindingContext, node);
-            } catch (ex) {
-                ex.message = "Unable to parse bindings.\nBindings value: " + bindingsString + "\nMessage: " + ex.message;
-                throw ex;
-            }
         };
 
     ko.bindingProvider = new class
@@ -1921,8 +1790,29 @@ ko.expressionRewriting = (() => {
         }
 
         getBindingAccessors(node, bindingContext) {
-            var bindingsString = getBindingsString(node, bindingContext);
-            return bindingsString ? parseBindingsString(bindingsString, bindingContext, node, { 'valueAccessors': true }) : null;
+            var bindingsString = getBindingsString(node);
+            if (bindingsString) {
+                try {
+                    let options = { 'valueAccessors': true },
+                        cacheKey = bindingsString,
+                        bindingFunction = bindingCache.get(cacheKey);
+                    if (!bindingFunction) {
+                        // Build the source for a function that evaluates "expression"
+                        // For each scope variable, add an extra level of "with" nesting
+                        // Example result: with(sc1) { with(sc0) { return (expression) } }
+                        var rewrittenBindings = ko.expressionRewriting.preProcessBindings(bindingsString, options),
+                            functionBody = "with($context){with($data||{}){return{" + rewrittenBindings + "}}}";
+                        bindingFunction = new Function("$context", "$element", functionBody);
+                        bindingCache.set(cacheKey, bindingFunction);
+                    }
+                    return bindingFunction(bindingContext, node);
+                } catch (ex) {
+                    ex.message = "Unable to parse bindings.\nBindings value: " + bindingsString
+                        + "\nMessage: " + ex.message;
+                    throw ex;
+                }
+            }
+            return null;
         }
     };
 
@@ -1935,142 +1825,132 @@ ko.expressionRewriting = (() => {
 
     ko.bindingHandlers = {};
 
-    // Use an overridable method for retrieving binding handlers so that plugins may support dynamically created handlers
-    ko['getBindingHandler'] = bindingKey => ko.bindingHandlers[bindingKey];
-
     var inheritParentVm = {};
 
     // The ko.bindingContext constructor is only called directly to create the root context. For child
     // contexts, use bindingContext.createChildContext or bindingContext.extend.
-    ko.bindingContext = function(dataItemOrAccessor, parentContext, dataItemAlias, extendCallback, options) {
+    ko.bindingContext = class {
+        constructor(dataItemOrAccessor, parentContext, dataItemAlias, extendCallback, options)
+        {
+            // The binding context object includes static properties for the current, parent, and root view models.
+            // If a view model is actually stored in an observable, the corresponding binding context object, and
+            // any child contexts, must be updated when the view model is changed.
+            function updateContext() {
+                // Most of the time, the context will directly get a view model object, but if a function is given,
+                // we call the function to retrieve the view model. If the function accesses any observables or returns
+                // an observable, the dependency is tracked, and those observables can later cause the binding
+                // context to be updated.
+                var dataItemOrObservable = isFunc ? realDataItemOrAccessor() : realDataItemOrAccessor,
+                    dataItem = ko.utils.unwrapObservable(dataItemOrObservable);
 
-        // The binding context object includes static properties for the current, parent, and root view models.
-        // If a view model is actually stored in an observable, the corresponding binding context object, and
-        // any child contexts, must be updated when the view model is changed.
-        function updateContext() {
-            // Most of the time, the context will directly get a view model object, but if a function is given,
-            // we call the function to retrieve the view model. If the function accesses any observables or returns
-            // an observable, the dependency is tracked, and those observables can later cause the binding
-            // context to be updated.
-            var dataItemOrObservable = isFunc ? realDataItemOrAccessor() : realDataItemOrAccessor,
-                dataItem = ko.utils.unwrapObservable(dataItemOrObservable);
+                if (parentContext) {
+                    // Copy $root and any custom properties from the parent context
+                    ko.utils.extend(self, parentContext);
 
-            if (parentContext) {
-                // Copy $root and any custom properties from the parent context
-                ko.utils.extend(self, parentContext);
+                    // Copy Symbol properties
+                    if (contextAncestorBindingInfo in parentContext) {
+                        self[contextAncestorBindingInfo] = parentContext[contextAncestorBindingInfo];
+                    }
+                } else {
+                    self['$parents'] = [];
+                    self['$root'] = dataItem;
 
-                // Copy Symbol properties
-                if (contextAncestorBindingInfo in parentContext) {
-                    self[contextAncestorBindingInfo] = parentContext[contextAncestorBindingInfo];
+                    // Export 'ko' in the binding context so it will be available in bindings and templates
+                    // even if 'ko' isn't exported as a global, such as when using an AMD loader.
+                    // See https://github.com/SteveSanderson/knockout/issues/490
+                    self['ko'] = ko;
                 }
+
+                self[contextSubscribable] = subscribable;
+
+                if (shouldInheritData) {
+                    dataItem = self['$data'];
+                } else {
+                    self['$rawData'] = dataItemOrObservable;
+                    self['$data'] = dataItem;
+                }
+
+                if (dataItemAlias)
+                    self[dataItemAlias] = dataItem;
+
+                // The extendCallback function is provided when creating a child context or extending a context.
+                // It handles the specific actions needed to finish setting up the binding context. Actions in this
+                // function could also add dependencies to this binding context.
+                if (extendCallback)
+                    extendCallback(self, parentContext, dataItem);
+
+                // When a "parent" context is given and we don't already have a dependency on its context, register a dependency on it.
+                // Thus whenever the parent context is updated, this context will also be updated.
+                if (parentContext && parentContext[contextSubscribable] && !ko.dependencyDetection.computed().hasAncestorDependency(parentContext[contextSubscribable])) {
+                    parentContext[contextSubscribable]();
+                }
+
+                if (dataDependency) {
+                    self[contextDataDependency] = dataDependency;
+                }
+
+                return self['$data'];
+            }
+
+            var self = this,
+                shouldInheritData = dataItemOrAccessor === inheritParentVm,
+                realDataItemOrAccessor = shouldInheritData ? undefined : dataItemOrAccessor,
+                isFunc = typeof(realDataItemOrAccessor) == "function" && !ko.isObservable(realDataItemOrAccessor),
+                subscribable,
+                dataDependency = options && options['dataDependency'];
+
+            if (options && options['exportDependencies']) {
+                // The "exportDependencies" option means that the calling code will track any dependencies and re-create
+                // the binding context when they change.
+                updateContext();
             } else {
-                self['$parents'] = [];
-                self['$root'] = dataItem;
+                subscribable = ko.pureComputed(updateContext);
+                subscribable.peek();
 
-                // Export 'ko' in the binding context so it will be available in bindings and templates
-                // even if 'ko' isn't exported as a global, such as when using an AMD loader.
-                // See https://github.com/SteveSanderson/knockout/issues/490
-                self['ko'] = ko;
+                // At this point, the binding context has been initialized, and the "subscribable" computed observable is
+                // subscribed to any observables that were accessed in the process. If there is nothing to track, the
+                // computed will be inactive, and we can safely throw it away. If it's active, the computed is stored in
+                // the context object.
+                if (subscribable.isActive()) {
+                    // Always notify because even if the model ($data) hasn't changed, other context properties might have changed
+                    subscribable['equalityComparer'] = null;
+                } else {
+                    self[contextSubscribable] = undefined;
+                }
             }
-
-            self[contextSubscribable] = subscribable;
-
-            if (shouldInheritData) {
-                dataItem = self['$data'];
-            } else {
-                self['$rawData'] = dataItemOrObservable;
-                self['$data'] = dataItem;
-            }
-
-            if (dataItemAlias)
-                self[dataItemAlias] = dataItem;
-
-            // The extendCallback function is provided when creating a child context or extending a context.
-            // It handles the specific actions needed to finish setting up the binding context. Actions in this
-            // function could also add dependencies to this binding context.
-            if (extendCallback)
-                extendCallback(self, parentContext, dataItem);
-
-            // When a "parent" context is given and we don't already have a dependency on its context, register a dependency on it.
-            // Thus whenever the parent context is updated, this context will also be updated.
-            if (parentContext && parentContext[contextSubscribable] && !ko.dependencyDetection.computed().hasAncestorDependency(parentContext[contextSubscribable])) {
-                parentContext[contextSubscribable]();
-            }
-
-            if (dataDependency) {
-                self[contextDataDependency] = dataDependency;
-            }
-
-            return self['$data'];
         }
 
-        var self = this,
-            shouldInheritData = dataItemOrAccessor === inheritParentVm,
-            realDataItemOrAccessor = shouldInheritData ? undefined : dataItemOrAccessor,
-            isFunc = typeof(realDataItemOrAccessor) == "function" && !ko.isObservable(realDataItemOrAccessor),
-            subscribable,
-            dataDependency = options && options['dataDependency'];
-
-        if (options && options['exportDependencies']) {
-            // The "exportDependencies" option means that the calling code will track any dependencies and re-create
-            // the binding context when they change.
-            updateContext();
-        } else {
-            subscribable = ko.pureComputed(updateContext);
-            subscribable.peek();
-
-            // At this point, the binding context has been initialized, and the "subscribable" computed observable is
-            // subscribed to any observables that were accessed in the process. If there is nothing to track, the
-            // computed will be inactive, and we can safely throw it away. If it's active, the computed is stored in
-            // the context object.
-            if (subscribable.isActive()) {
-                // Always notify because even if the model ($data) hasn't changed, other context properties might have changed
-                subscribable['equalityComparer'] = null;
-            } else {
-                self[contextSubscribable] = undefined;
+        // Extend the binding context hierarchy with a new view model object. If the parent context is watching
+        // any observables, the new child context will automatically get a dependency on the parent context.
+        // But this does not mean that the $data value of the child context will also get updated. If the child
+        // view model also depends on the parent view model, you must provide a function that returns the correct
+        // view model on each update.
+       'createChildContext'(dataItemOrAccessor, dataItemAlias, extendCallback, options) {
+            if (!options && dataItemAlias && typeof dataItemAlias == "object") {
+                options = dataItemAlias;
+                dataItemAlias = options['as'];
+                extendCallback = options['extend'];
             }
-        }
-    }
 
-    // Extend the binding context hierarchy with a new view model object. If the parent context is watching
-    // any observables, the new child context will automatically get a dependency on the parent context.
-    // But this does not mean that the $data value of the child context will also get updated. If the child
-    // view model also depends on the parent view model, you must provide a function that returns the correct
-    // view model on each update.
-    ko.bindingContext.prototype['createChildContext'] = function (dataItemOrAccessor, dataItemAlias, extendCallback, options) {
-        if (!options && dataItemAlias && typeof dataItemAlias == "object") {
-            options = dataItemAlias;
-            dataItemAlias = options['as'];
-            extendCallback = options['extend'];
-        }
-
-        if (dataItemAlias && options && options['noChildContext']) {
-            var isFunc = typeof(dataItemOrAccessor) == "function" && !ko.isObservable(dataItemOrAccessor);
-            return new ko.bindingContext(inheritParentVm, this, null, self => {
+            return new ko.bindingContext(dataItemOrAccessor, this, dataItemAlias, (self, parentContext) => {
+                // Extend the context hierarchy by setting the appropriate pointers
+                self['$parentContext'] = parentContext;
+                self['$parent'] = parentContext['$data'];
+                self['$parents'] = (parentContext['$parents'] || []).slice(0);
+                self['$parents'].unshift(self['$parent']);
                 if (extendCallback)
                     extendCallback(self);
-                self[dataItemAlias] = isFunc ? dataItemOrAccessor() : dataItemOrAccessor;
             }, options);
         }
 
-        return new ko.bindingContext(dataItemOrAccessor, this, dataItemAlias, (self, parentContext) => {
-            // Extend the context hierarchy by setting the appropriate pointers
-            self['$parentContext'] = parentContext;
-            self['$parent'] = parentContext['$data'];
-            self['$parents'] = (parentContext['$parents'] || []).slice(0);
-            self['$parents'].unshift(self['$parent']);
-            if (extendCallback)
-                extendCallback(self);
-        }, options);
-    };
-
-    // Extend the binding context with new custom properties. This doesn't change the context hierarchy.
-    // Similarly to "child" contexts, provide a function here to make sure that the correct values are set
-    // when an observable view model is updated.
-    ko.bindingContext.prototype['extend'] = function(properties, options) {
-        return new ko.bindingContext(inheritParentVm, this, null, self =>
-            ko.utils.extend(self, typeof(properties) == "function" ? properties(self) : properties)
-        , options);
+        // Extend the binding context with new custom properties. This doesn't change the context hierarchy.
+        // Similarly to "child" contexts, provide a function here to make sure that the correct values are set
+        // when an observable view model is updated.
+        'extend'(properties, options) {
+            return new ko.bindingContext(inheritParentVm, this, null, self =>
+                ko.utils.extend(self, typeof(properties) == "function" ? properties(self) : properties)
+            , options);
+        }
     };
 
     var boundElementDomDataKey = ko.utils.domData.nextKey();
@@ -2083,41 +1963,44 @@ ko.expressionRewriting = (() => {
             asyncContext.notifyAncestor();
         }
     }
-    function AsyncCompleteContext(node, bindingInfo, ancestorBindingInfo) {
-        this.node = node;
-        this.bindingInfo = bindingInfo;
-        this.asyncDescendants = [];
-        this.childrenComplete = false;
 
-        if (!bindingInfo.asyncContext) {
-            ko.utils.domNodeDisposal.addDisposeCallback(node, asyncContextDispose);
+    class AsyncCompleteContext {
+        constructor(node, bindingInfo, ancestorBindingInfo) {
+            this.node = node;
+            this.bindingInfo = bindingInfo;
+            this.asyncDescendants = new Set;
+            this.childrenComplete = false;
+
+            if (!bindingInfo.asyncContext) {
+                ko.utils.domNodeDisposal.addDisposeCallback(node, asyncContextDispose);
+            }
+
+            if (ancestorBindingInfo && ancestorBindingInfo.asyncContext) {
+                ancestorBindingInfo.asyncContext.asyncDescendants.add(node);
+                this.ancestorBindingInfo = ancestorBindingInfo;
+            }
         }
-
-        if (ancestorBindingInfo && ancestorBindingInfo.asyncContext) {
-            ancestorBindingInfo.asyncContext.asyncDescendants.push(node);
-            this.ancestorBindingInfo = ancestorBindingInfo;
+        notifyAncestor() {
+            if (this.ancestorBindingInfo && this.ancestorBindingInfo.asyncContext) {
+                this.ancestorBindingInfo.asyncContext.descendantComplete(this.node);
+            }
+        }
+        descendantComplete(node) {
+            this.asyncDescendants.delete(node);
+            if (!this.asyncDescendants.size && this.childrenComplete) {
+                this.completeChildren();
+            }
+        }
+        completeChildren() {
+            this.childrenComplete = true;
+            if (this.bindingInfo.asyncContext && !this.asyncDescendants.size) {
+                this.bindingInfo.asyncContext = null;
+                ko.utils.domNodeDisposal.removeDisposeCallback(this.node, asyncContextDispose);
+                ko.bindingEvent.notify(this.node, ko.bindingEvent.descendantsComplete);
+                this.notifyAncestor();
+            }
         }
     }
-    AsyncCompleteContext.prototype.notifyAncestor = function () {
-        if (this.ancestorBindingInfo && this.ancestorBindingInfo.asyncContext) {
-            this.ancestorBindingInfo.asyncContext.descendantComplete(this.node);
-        }
-    };
-    AsyncCompleteContext.prototype.descendantComplete = function (node) {
-        ko.utils.arrayRemoveItem(this.asyncDescendants, node);
-        if (!this.asyncDescendants.length && this.childrenComplete) {
-            this.completeChildren();
-        }
-    };
-    AsyncCompleteContext.prototype.completeChildren = function () {
-        this.childrenComplete = true;
-        if (this.bindingInfo.asyncContext && !this.asyncDescendants.length) {
-            this.bindingInfo.asyncContext = null;
-            ko.utils.domNodeDisposal.removeDisposeCallback(this.node, asyncContextDispose);
-            ko.bindingEvent.notify(this.node, ko.bindingEvent.descendantsComplete);
-            this.notifyAncestor();
-        }
-    };
 
     ko.bindingEvent = {
         childrenComplete: "childrenComplete",
@@ -2171,24 +2054,6 @@ ko.expressionRewriting = (() => {
         }
     };
 
-    // Given a function that returns bindings, create and return a new object that contains
-    // binding value-accessors functions. Each accessor function calls the original function
-    // so that it always gets the latest value and all dependencies are captured. This is used
-    // by ko.applyBindingsToNode and getBindingsAndMakeAccessors.
-    function makeAccessorsFromFunction(callback) {
-        return ko.utils.objectMap(ko.dependencyDetection.ignore(callback), (value, key) =>
-            () => callback()[key]
-        );
-    }
-
-    // Given a bindings function or object, create and return a new object that contains
-    // binding value-accessors functions. This is used by ko.applyBindingsToNode.
-    function makeBindingAccessors(bindings, context, node) {
-        return (typeof bindings === 'function')
-            ? makeAccessorsFromFunction(bindings.bind(null, context, node))
-            : ko.utils.objectMap(bindings, value => () => value);
-    }
-
     function validateThatBindingIsAllowedForVirtualElements(bindingName) {
         var validator = ko.virtualElements.allowedBindings[bindingName];
         if (!validator)
@@ -2196,16 +2061,12 @@ ko.expressionRewriting = (() => {
     }
 
     function applyBindingsToDescendantsInternal(bindingContext, elementOrVirtualElement) {
-        var nextInQueue = ko.virtualElements.firstChild(elementOrVirtualElement);
+        var currentChild, nextInQueue = ko.virtualElements.firstChild(elementOrVirtualElement);
 
-        if (nextInQueue) {
-            var currentChild;
-
-            while (currentChild = nextInQueue) {
-                // Keep a record of the next child *before* applying bindings, in case the binding removes the current child from its position
-                nextInQueue = ko.virtualElements.nextSibling(currentChild);
-                applyBindingsToNodeAndDescendantsInternal(bindingContext, currentChild);
-            }
+        while (currentChild = nextInQueue) {
+            // Keep a record of the next child *before* applying bindings, in case the binding removes the current child from its position
+            nextInQueue = ko.virtualElements.nextSibling(currentChild);
+            applyBindingsToNodeAndDescendantsInternal(bindingContext, currentChild);
         }
         ko.bindingEvent.notify(elementOrVirtualElement, ko.bindingEvent.childrenComplete);
     }
@@ -2239,7 +2100,7 @@ ko.expressionRewriting = (() => {
             cyclicDependencyStack = []; // Keeps track of a depth-search so that, if there's a cycle, we know which bindings caused it
         ko.utils.objectForEach(bindings, function pushBinding(bindingKey) {
             if (!bindingsConsidered[bindingKey]) {
-                var binding = ko['getBindingHandler'](bindingKey);
+                var binding = ko.bindingHandlers[bindingKey];
                 if (binding) {
                     // First add dependencies (if any) of the current binding
                     if (binding['after']) {
@@ -2320,13 +2181,12 @@ ko.expressionRewriting = (() => {
                 ? bindingKey => () => bindingsUpdater()[bindingKey]()
                 : bindingKey => bindings[bindingKey];
 
-            // Use of allBindings as a function is maintained for backwards compatibility, but its use is deprecated
-            function allBindings() {
-                return ko.utils.objectMap(bindingsUpdater ? bindingsUpdater() : bindings, valueAccessor => valueAccessor());
-            }
+            // Use of allBindings as a function is deprecated and removed
             // The following is the 3.x allBindings API
-            allBindings['get'] = key => bindings[key] && getValueAccessor(key)();
-            allBindings['has'] = key => key in bindings;
+            var allBindings = {
+                'get': key => bindings[key] && getValueAccessor(key)(),
+                'has': key => key in bindings
+            };
 
             if (ko.bindingEvent.childrenComplete in bindings) {
                 ko.bindingEvent.subscribe(node, ko.bindingEvent.childrenComplete, () => {
@@ -2413,11 +2273,6 @@ ko.expressionRewriting = (() => {
     ko.applyBindingAccessorsToNode = (node, bindings, viewModelOrBindingContext) =>
         applyBindingsToNodeInternal(node, bindings, getBindingContext(viewModelOrBindingContext));
 
-    ko.applyBindingsToNode = (node, bindings, viewModelOrBindingContext) => {
-        var context = getBindingContext(viewModelOrBindingContext);
-        return ko.applyBindingAccessorsToNode(node, makeBindingAccessors(bindings, context, node), context);
-    };
-
     ko.applyBindingsToDescendants = (viewModelOrBindingContext, rootNode) => {
         if (rootNode.nodeType === 1 || rootNode.nodeType === 8)
             applyBindingsToDescendantsInternal(getBindingContext(viewModelOrBindingContext), rootNode);
@@ -2449,144 +2304,63 @@ ko.expressionRewriting = (() => {
     ko.exportSymbol('dataFor', ko.dataFor);
 })();
 (() => {
-    var loadingSubscribablesCache = {}, // Tracks component loads that are currently in flight
-        loadedDefinitionsCache = {};    // Tracks component loads that have already completed
+    var loadingSubscribablesCache = Object.create(null), // Tracks component loads that are currently in flight
+        loadedDefinitionsCache = Object.create(null);    // Tracks component loads that have already completed
 
     ko.components = {
         get: (componentName, callback) => {
-            var cachedDefinition = getObjectOwnProperty(loadedDefinitionsCache, componentName);
+            var cachedDefinition = loadedDefinitionsCache[componentName];
             if (cachedDefinition) {
-                // It's already loaded and cached. Reuse the same definition object.
-                // Note that for API consistency, even cache hits complete asynchronously by default.
-                // You can bypass this by putting synchronous:true on your component config.
-                if (cachedDefinition.isSynchronousComponent) {
-                    ko.dependencyDetection.ignore(() => // See comment in loaderRegistryBehaviors.js for reasoning
-                        callback(cachedDefinition.definition)
-                    );
-                } else {
-                    ko.tasks.schedule(() => callback(cachedDefinition.definition) );
-                }
+                ko.tasks.schedule(() => callback(cachedDefinition.definition) );
             } else {
                 // Join the loading process that is already underway, or start a new one.
-                loadComponentAndNotify(componentName, callback);
+                var subscribable = loadingSubscribablesCache[componentName],
+                    completedAsync;
+                if (subscribable) {
+                    subscribable.subscribe(callback);
+                } else {
+                    // It's not started loading yet. Start loading, and when it's done, move it to loadedDefinitionsCache.
+                    subscribable = loadingSubscribablesCache[componentName] = new ko.subscribable();
+                    subscribable.subscribe(callback);
+
+                    beginLoadingComponent(componentName, definition => {
+                        loadedDefinitionsCache[componentName] = { definition: definition };
+                        delete loadingSubscribablesCache[componentName];
+
+                        // For API consistency, all loads complete asynchronously. However we want to avoid
+                        // adding an extra task schedule if it's unnecessary (i.e., the completion is already
+                        // async).
+                        //
+                        // You can bypass the 'always asynchronous' feature by putting the synchronous:true
+                        // flag on your component configuration when you register it.
+                        if (completedAsync) {
+                            // Note that notifySubscribers ignores any dependencies read within the callback.
+                            // See comment in loaderRegistryBehaviors.js for reasoning
+                            subscribable['notifySubscribers'](definition);
+                        } else {
+                            ko.tasks.schedule(() => subscribable['notifySubscribers'](definition));
+                        }
+                    });
+                    completedAsync = true;
+                }
             }
         },
 
         clearCachedDefinition: componentName =>
-            delete loadedDefinitionsCache[componentName]
-        ,
+            delete loadedDefinitionsCache[componentName],
 
-        _getFirstResultFromLoaders: getFirstResultFromLoaders
+        register: (componentName, config) => {
+            if (!config) {
+                throw new Error('Invalid configuration for ' + componentName);
+            }
+
+            if (defaultConfigRegistry[componentName]) {
+                throw new Error('Component ' + componentName + ' is already registered');
+            }
+
+            defaultConfigRegistry[componentName] = config;
+        }
     };
-
-    function getObjectOwnProperty(obj, propName) {
-        return Object.prototype.hasOwnProperty.call(obj, propName) ? obj[propName] : undefined;
-    }
-
-    function loadComponentAndNotify(componentName, callback) {
-        var subscribable = getObjectOwnProperty(loadingSubscribablesCache, componentName),
-            completedAsync;
-        if (!subscribable) {
-            // It's not started loading yet. Start loading, and when it's done, move it to loadedDefinitionsCache.
-            subscribable = loadingSubscribablesCache[componentName] = new ko.subscribable();
-            subscribable.subscribe(callback);
-
-            beginLoadingComponent(componentName, (definition, config) => {
-                var isSynchronousComponent = !!(config && config['synchronous']);
-                loadedDefinitionsCache[componentName] = { definition: definition, isSynchronousComponent: isSynchronousComponent };
-                delete loadingSubscribablesCache[componentName];
-
-                // For API consistency, all loads complete asynchronously. However we want to avoid
-                // adding an extra task schedule if it's unnecessary (i.e., the completion is already
-                // async).
-                //
-                // You can bypass the 'always asynchronous' feature by putting the synchronous:true
-                // flag on your component configuration when you register it.
-                if (completedAsync || isSynchronousComponent) {
-                    // Note that notifySubscribers ignores any dependencies read within the callback.
-                    // See comment in loaderRegistryBehaviors.js for reasoning
-                    subscribable['notifySubscribers'](definition);
-                } else {
-                    ko.tasks.schedule(() => subscribable['notifySubscribers'](definition));
-                }
-            });
-            completedAsync = true;
-        } else {
-            subscribable.subscribe(callback);
-        }
-    }
-
-    function beginLoadingComponent(componentName, callback) {
-        getFirstResultFromLoaders('getConfig', [componentName], config => {
-            if (config) {
-                // We have a config, so now load its definition
-                getFirstResultFromLoaders('loadComponent', [componentName, config], definition =>
-                    callback(definition, config)
-                );
-            } else {
-                // The component has no config - it's unknown to all the loaders.
-                // Note that this is not an error (e.g., a module loading error) - that would abort the
-                // process and this callback would not run. For this callback to run, all loaders must
-                // have confirmed they don't know about this component.
-                callback(null, null);
-            }
-        });
-    }
-
-    function getFirstResultFromLoaders(methodName, argsExceptCallback, callback, candidateLoaders) {
-        // On the first call in the stack, start with the full set of loaders
-        if (!candidateLoaders) {
-            candidateLoaders = ko.components['loaders'].slice(0); // Use a copy, because we'll be mutating this array
-        }
-
-        // Try the next candidate
-        var currentCandidateLoader = candidateLoaders.shift();
-        if (currentCandidateLoader) {
-            var methodInstance = currentCandidateLoader[methodName];
-            if (methodInstance) {
-                var wasAborted = false,
-                    synchronousReturnValue = methodInstance.apply(currentCandidateLoader, argsExceptCallback.concat(function(result) {
-                        if (wasAborted) {
-                            callback(null);
-                        } else if (result !== null) {
-                            // This candidate returned a value. Use it.
-                            callback(result);
-                        } else {
-                            // Try the next candidate
-                            getFirstResultFromLoaders(methodName, argsExceptCallback, callback, candidateLoaders);
-                        }
-                    }));
-
-                // Currently, loaders may not return anything synchronously. This leaves open the possibility
-                // that we'll extend the API to support synchronous return values in the future. It won't be
-                // a breaking change, because currently no loader is allowed to return anything except undefined.
-                if (synchronousReturnValue !== undefined) {
-                    wasAborted = true;
-
-                    // Method to suppress exceptions will remain undocumented. This is only to keep
-                    // KO's specs running tidily, since we can observe the loading got aborted without
-                    // having exceptions cluttering up the console too.
-                    if (!currentCandidateLoader['suppressLoaderExceptions']) {
-                        throw new Error('Component loaders must supply values by invoking the callback, not by returning values synchronously.');
-                    }
-                }
-            } else {
-                // This candidate doesn't have the relevant handler. Synchronously move on to the next one.
-                getFirstResultFromLoaders(methodName, argsExceptCallback, callback, candidateLoaders);
-            }
-        } else {
-            // No candidates returned a value
-            callback(null);
-        }
-    }
-
-    // Reference the loaders via string name so it's possible for developers
-    // to replace the whole array by assigning to ko.components.loaders
-    ko.components['loaders'] = [];
-
-    ko.exportSymbol('components', ko.components);
-})();
-(() => {
 
     // The default loader is responsible for two things:
     // 1. Maintaining the default in-memory registry of component configuration objects
@@ -2598,49 +2372,7 @@ ko.expressionRewriting = (() => {
     // 1. To supply configuration objects from some other source (e.g., conventions)
     // 2. Or, to resolve configuration objects by loading viewmodels/templates via arbitrary logic.
 
-    var defaultConfigRegistry = {};
-
-    ko.components.register = (componentName, config) => {
-        if (!config) {
-            throw new Error('Invalid configuration for ' + componentName);
-        }
-
-        if (ko.components.isRegistered(componentName)) {
-            throw new Error('Component ' + componentName + ' is already registered');
-        }
-
-        defaultConfigRegistry[componentName] = config;
-    };
-
-    ko.components.isRegistered = componentName =>
-        Object.prototype.hasOwnProperty.call(defaultConfigRegistry, componentName);
-
-    ko.components.unregister = componentName => {
-        delete defaultConfigRegistry[componentName];
-        ko.components.clearCachedDefinition(componentName);
-    };
-
-    ko.components.defaultLoader = {
-        'getConfig': (componentName, callback) => {
-            var result = ko.components.isRegistered(componentName)
-                ? defaultConfigRegistry[componentName]
-                : null;
-            callback(result);
-        },
-
-        'loadComponent': (componentName, config, callback) => {
-            var errorCallback = makeErrorCallback(componentName);
-            resolveConfig(componentName, errorCallback, config, callback);
-        },
-
-        'loadTemplate': (componentName, templateConfig, callback) =>
-            resolveTemplate(makeErrorCallback(componentName), templateConfig, callback)
-        ,
-
-        'loadViewModel': (componentName, viewModelConfig, callback) =>
-            resolveViewModel(makeErrorCallback(componentName), viewModelConfig, callback)
-    };
-
+    var defaultConfigRegistry = Object.create(null);
     var createViewModelKey = 'createViewModel';
 
     // Takes a config object of the form { template: ..., viewModel: ... }, and asynchronously convert it
@@ -2649,107 +2381,64 @@ ko.expressionRewriting = (() => {
     // Since both template and viewModel may need to be resolved asynchronously, both tasks are performed
     // in parallel, and the results joined when both are ready. We don't depend on any promises infrastructure,
     // so this is implemented manually below.
-    function resolveConfig(componentName, errorCallback, config, callback) {
+    function loadComponent(componentName, callback) {
         var result = {},
-            makeCallBackWhenZero = 2,
-            tryIssueCallback = () => {
-                if (--makeCallBackWhenZero === 0) {
-                    callback(result);
-                }
-            },
+            config = defaultConfigRegistry[componentName] || {},
             templateConfig = config['template'],
             viewModelConfig = config['viewModel'];
 
         if (templateConfig) {
-            ko.components._getFirstResultFromLoaders('loadTemplate', [componentName, templateConfig], resolvedTemplate => {
-                result['template'] = resolvedTemplate;
-                tryIssueCallback();
-            });
-        } else {
-            tryIssueCallback();
+            if (!templateConfig['element']) {
+                throwError(componentName, 'Unknown template value: ' + templateConfig);
+            }
+            // Element ID - find it, then copy its child nodes
+            var element = templateConfig['element'];
+            var elemInstance = document.getElementById(element);
+            if (!elemInstance) {
+                throwError(componentName, 'Cannot find element with ID ' + element);
+            }
+            if (!elemInstance.matches('TEMPLATE')) {
+                throwError(componentName, 'Template Source Element not a <template>');
+            }
+            // For browsers with proper <template> element support (i.e., where the .content property
+            // gives a document fragment), use that document fragment.
+            result['template'] = ko.utils.cloneNodes(elemInstance.content.childNodes);
         }
 
         if (viewModelConfig) {
-            ko.components._getFirstResultFromLoaders('loadViewModel', [componentName, viewModelConfig], resolvedViewModel => {
-                result[createViewModelKey] = resolvedViewModel;
-                tryIssueCallback();
-            });
-        } else {
-            tryIssueCallback();
-        }
-    }
-
-    function resolveTemplate(errorCallback, templateConfig, callback) {
-        if (templateConfig instanceof Array) {
-            // Assume already an array of DOM nodes - pass through unchanged
-            callback(templateConfig);
-        } else if (templateConfig instanceof DocumentFragment) {
-            // Document fragment - use its child nodes
-            callback([...templateConfig.childNodes]);
-        } else if (templateConfig['element']) {
-            var element = templateConfig['element'];
-            if (element instanceof HTMLElement) {
-                // Element instance - copy its child nodes
-                callback(cloneNodesFromTemplateSourceElement(element));
-            } else if (typeof element === 'string') {
-                // Element ID - find it, then copy its child nodes
-                var elemInstance = document.getElementById(element);
-                if (elemInstance) {
-                    callback(cloneNodesFromTemplateSourceElement(elemInstance));
-                } else {
-                    errorCallback('Cannot find element with ID ' + element);
-                }
-            } else {
-                errorCallback('Unknown element type: ' + element);
+            if (typeof viewModelConfig[createViewModelKey] !== 'function') {
+                throwError(componentName, 'Unknown viewModel value: ' + viewModelConfig);
             }
-        } else {
-            errorCallback('Unknown template value: ' + templateConfig);
-        }
-    }
-
-    function resolveViewModel(errorCallback, viewModelConfig, callback) {
-        if (typeof viewModelConfig === 'function') {
-            // Constructor - convert to standard factory function format
-            // By design, this does *not* supply componentInfo to the constructor, as the intent is that
-            // componentInfo contains non-viewmodel data (e.g., the component's element) that should only
-            // be used in factory functions, not viewmodel constructors.
-            callback(params => new viewModelConfig(params));
-        } else if (typeof viewModelConfig[createViewModelKey] === 'function') {
             // Already a factory function - use it as-is
-            callback(viewModelConfig[createViewModelKey]);
-        } else if ('instance' in viewModelConfig) {
-            // Fixed object instance - promote to createViewModel format for API consistency
-            var fixedInstance = viewModelConfig['instance'];
-            callback(() => fixedInstance);
-        } else if ('viewModel' in viewModelConfig) {
-            // Resolved AMD module whose value is of the form { viewModel: ... }
-            resolveViewModel(errorCallback, viewModelConfig['viewModel'], callback);
+            result[createViewModelKey] = viewModelConfig[createViewModelKey];
+        }
+
+        if (result['template'] && result[createViewModelKey]) {
+            callback(result);
         } else {
-            errorCallback('Unknown viewModel value: ' + viewModelConfig);
+            callback(null);
         }
     }
 
-    function cloneNodesFromTemplateSourceElement(elemInstance) {
-        if (elemInstance.matches('TEMPLATE')) {
-            // For browsers with proper <template> element support (i.e., where the .content property
-            // gives a document fragment), use that document fragment.
-            if (elemInstance.content instanceof DocumentFragment) {
-                return ko.utils.cloneNodes(elemInstance.content.childNodes);
-            }
+    function throwError(componentName, message) {
+        throw new Error(`Component '${componentName}': ${message}`)
+    }
+
+    function beginLoadingComponent(componentName, callback) {
+        // Try the candidates
+        var found = false;
+        loadComponent(componentName, result => {
+            // This candidate returned a value. Use it.
+            (found = result != null) && callback(result);
+        });
+        if (!found) {
+            // No candidates returned a value
+            callback(null);
         }
-        throw 'Template Source Element not a <template>';
     }
 
-    function makeErrorCallback(componentName) {
-        return message => {
-            throw new Error('Component \'' + componentName + '\': ' + message)
-        };
-    }
-
+    ko.exportSymbol('components', ko.components);
     ko.exportSymbol('components.register', ko.components.register);
-
-    // By default, the default loader is the only registered component loader
-    ko.components['loaders'].push(ko.components.defaultLoader);
 })();
 (() => {
     var componentLoadingOperationUniqueId = 0;
@@ -2778,14 +2467,12 @@ ko.expressionRewriting = (() => {
             ko.utils.domNodeDisposal.addDisposeCallback(element, disposeAssociatedComponentViewModel);
 
             ko.computed(() => {
-                var value = ko.utils.unwrapObservable(valueAccessor()),
-                    componentName, componentParams;
+                var componentName = ko.utils.unwrapObservable(valueAccessor()),
+                    componentParams;
 
-                if (typeof value === 'string') {
-                    componentName = value;
-                } else {
-                    componentName = ko.utils.unwrapObservable(value['name']);
-                    componentParams = ko.utils.unwrapObservable(value['params']);
+                if (typeof componentName !== 'string') {
+                    componentParams = ko.utils.unwrapObservable(componentName['params']);
+                    componentName = ko.utils.unwrapObservable(componentName['name']);
                 }
 
                 if (!componentName) {
@@ -2796,39 +2483,33 @@ ko.expressionRewriting = (() => {
 
                 var loadingOperationId = currentLoadingOperationId = ++componentLoadingOperationUniqueId;
                 ko.components.get(componentName, componentDefinition => {
-                    // If this is not the current load operation for this element, ignore it.
-                    if (currentLoadingOperationId !== loadingOperationId) {
-                        return;
-                    }
+                    // If this is the current load operation for this element
+                    if (currentLoadingOperationId === loadingOperationId) {
+                        // Clean up previous state
+                        disposeAssociatedComponentViewModel();
 
-                    // Clean up previous state
-                    disposeAssociatedComponentViewModel();
+                        // Instantiate and bind new component. Implicitly this cleans any old DOM nodes.
+                        if (!componentDefinition) {
+                            throw new Error('Unknown component \'' + componentName + '\'');
+                        }
+                        // cloneTemplateIntoElement
+                        var template = componentDefinition['template'];
+                        if (!template) {
+                            throw new Error('Component \'' + componentName + '\' has no template');
+                        }
+                        ko.virtualElements.setDomNodeChildren(element, ko.utils.cloneNodes(template));
 
-                    // Instantiate and bind new component. Implicitly this cleans any old DOM nodes.
-                    if (!componentDefinition) {
-                        throw new Error('Unknown component \'' + componentName + '\'');
-                    }
-                    cloneTemplateIntoElement(componentName, componentDefinition, element);
-
-                    var componentInfo = {
-                        'element': element,
-                        'templateNodes': originalChildNodes
-                    };
-
-                    var componentViewModel = createViewModel(componentDefinition, componentParams, componentInfo),
-                        childBindingContext = asyncContext['createChildContext'](componentViewModel, {
-                            'extend': ctx => {
-                                ctx['$component'] = componentViewModel;
-                                ctx['$componentTemplateNodes'] = originalChildNodes;
-                            }
+                        currentViewModel = componentDefinition['createViewModel'](componentParams, {
+                            'element': element,
+                            'templateNodes': originalChildNodes
                         });
-
-                    if (componentViewModel && componentViewModel['koDescendantsComplete']) {
-                        afterRenderSub = ko.bindingEvent.subscribe(element, ko.bindingEvent.descendantsComplete, componentViewModel['koDescendantsComplete'], componentViewModel);
+                        ko.applyBindingsToDescendants(asyncContext['createChildContext'](currentViewModel, {
+                                'extend': ctx => {
+                                    ctx['$component'] = currentViewModel;
+                                    ctx['$componentTemplateNodes'] = originalChildNodes;
+                                }
+                            }), element);
                     }
-
-                    currentViewModel = componentViewModel;
-                    ko.applyBindingsToDescendants(childBindingContext, element);
                 });
             }, { disposeWhenNodeIsRemoved: element });
 
@@ -2838,27 +2519,9 @@ ko.expressionRewriting = (() => {
 
     ko.virtualElements.allowedBindings['component'] = true;
 
-    function cloneTemplateIntoElement(componentName, componentDefinition, element) {
-        var template = componentDefinition['template'];
-        if (!template) {
-            throw new Error('Component \'' + componentName + '\' has no template');
-        }
-
-        var clonedNodesArray = ko.utils.cloneNodes(template);
-        ko.virtualElements.setDomNodeChildren(element, clonedNodesArray);
-    }
-
-    function createViewModel(componentDefinition, componentParams, componentInfo) {
-        var componentViewModelFactory = componentDefinition['createViewModel'];
-        return componentViewModelFactory
-            ? componentViewModelFactory.call(componentDefinition, componentParams, componentInfo)
-            : componentParams; // Template-only component
-    }
-
 })();
-var attrHtmlToJavaScriptMap = { 'class': 'className', 'for': 'htmlFor' };
 ko.bindingHandlers['attr'] = {
-    'update': (element, valueAccessor, allBindings) => {
+    'update': (element, valueAccessor) => {
         var value = ko.utils.unwrapObservable(valueAccessor()) || {};
         ko.utils.objectForEach(value, function(attrName, attrValue) {
             attrValue = ko.utils.unwrapObservable(attrValue);
@@ -2870,7 +2533,7 @@ ko.bindingHandlers['attr'] = {
             // To cover cases like "attr: { checked:someProp }", we want to remove the attribute entirely
             // when someProp is a "no value"-like value (strictly null, false, or undefined)
             // (because the absence of the "checked" attr is how to mark an element as not checked, etc.)
-            var toRemove = (attrValue === false) || (attrValue === null) || (attrValue === undefined);
+            var toRemove = (attrValue === false) || (attrValue == null);
             if (toRemove) {
                 namespace ? element.removeAttributeNS(namespace, attrName) : element.removeAttribute(attrName);
             } else {
@@ -2950,7 +2613,7 @@ ko.bindingHandlers['event'] = {
         var eventsToHandle = valueAccessor() || {};
         ko.utils.objectForEach(eventsToHandle, eventName => {
             if (typeof eventName == "string") {
-                ko.utils.registerEventHandler(element, eventName, function (event) {
+                element.addEventListener(eventName, function (event) {
                     var handlerReturnValue;
                     var handlerFunction = valueAccessor()[eventName];
                     if (!handlerFunction)
@@ -2964,12 +2627,6 @@ ko.bindingHandlers['event'] = {
                         if (handlerReturnValue !== true) { // Normally we want to prevent default action. Developer can override this be explicitly returning true.
                             event.preventDefault();
                         }
-                    }
-
-                    var bubble = allBindings.get(eventName + 'Bubble') !== false;
-                    if (!bubble) {
-                        event.cancelBubble = true;
-                        event.stopPropagation();
                     }
                 });
             }
@@ -2996,13 +2653,7 @@ ko.bindingHandlers['foreach'] = {
             return {
                 'foreach': unwrappedValue['data'],
                 'as': unwrappedValue['as'],
-                'noChildContext': unwrappedValue['noChildContext'],
-                'includeDestroyed': unwrappedValue['includeDestroyed'],
-                'afterAdd': unwrappedValue['afterAdd'],
-                'beforeRemove': unwrappedValue['beforeRemove'],
-                'afterRender': unwrappedValue['afterRender'],
-                'beforeMove': unwrappedValue['beforeMove'],
-                'afterMove': unwrappedValue['afterMove']
+                'beforeRemove': unwrappedValue['beforeRemove']
             };
         };
     },
@@ -3037,10 +2688,13 @@ ko.bindingHandlers['hasfocus'] = {
         var handleElementFocusIn = handleElementFocusChange.bind(null, true);
         var handleElementFocusOut = handleElementFocusChange.bind(null, false);
 
-        ko.utils.registerEventHandler(element, "focus", handleElementFocusIn);
-        ko.utils.registerEventHandler(element, "focusin", handleElementFocusIn);
-        ko.utils.registerEventHandler(element, "blur",  handleElementFocusOut);
-        ko.utils.registerEventHandler(element, "focusout",  handleElementFocusOut);
+        var registerEventHandler = (event, handler) =>
+            element.addEventListener(event, handler);
+
+        registerEventHandler("focus", handleElementFocusIn);
+        registerEventHandler("focusin", handleElementFocusIn);
+        registerEventHandler("blur",  handleElementFocusOut);
+        registerEventHandler("focusout",  handleElementFocusOut);
 
         // Assume element is not focused (prevents "blur" being called initially)
         element[hasfocusLastValue] = false;
@@ -3053,7 +2707,7 @@ ko.bindingHandlers['hasfocus'] = {
         }
     }
 };
-ko.expressionRewriting.twoWayBindings['hasfocus'] = true;
+ko.expressionRewriting.twoWayBindings.add('hasfocus');
 ko.bindingHandlers['html'] = {
     'init': () => {
         // Prevent binding on the dynamically-injected HTML (as developers are unlikely to expect that, and it has security implications)
@@ -3079,16 +2733,14 @@ ko.bindingHandlers['html'] = {
 function makeWithIfBinding(bindingKey, isWith, isNot) {
     ko.bindingHandlers[bindingKey] = {
         'init': (element, valueAccessor, allBindings, viewModel, bindingContext) => {
-            var didDisplayOnLastUpdate, savedNodes, contextOptions = {}, completeOnRender, needAsyncContext, renderOnEveryChange;
+            var savedNodes, contextOptions = {}, needAsyncContext;
 
             if (isWith) {
-                var as = allBindings.get('as'), noChildContext = allBindings.get('noChildContext');
-                renderOnEveryChange = !(as && noChildContext);
-                contextOptions = { 'as': as, 'noChildContext': noChildContext, 'exportDependencies': renderOnEveryChange };
+                var as = allBindings.get('as');
+                contextOptions = { 'as': as, 'exportDependencies': true };
             }
 
-            completeOnRender = allBindings.get("completeOn") == "render";
-            needAsyncContext = completeOnRender || allBindings['has'](ko.bindingEvent.descendantsComplete);
+            needAsyncContext = allBindings['has'](ko.bindingEvent.descendantsComplete);
 
             ko.computed(() => {
                 var value = ko.utils.unwrapObservable(valueAccessor()),
@@ -3096,18 +2748,12 @@ function makeWithIfBinding(bindingKey, isWith, isNot) {
                     isInitial = !savedNodes,
                     childContext;
 
-                if (!renderOnEveryChange && shouldDisplay === didDisplayOnLastUpdate) {
-                    return;
-                }
-
                 if (needAsyncContext) {
                     bindingContext = ko.bindingEvent.startPossiblyAsyncContentBinding(element, bindingContext);
                 }
 
                 if (shouldDisplay) {
-                    if (!isWith || renderOnEveryChange) {
-                        contextOptions['dataDependency'] = ko.dependencyDetection.computed();
-                    }
+                    contextOptions['dataDependency'] = ko.dependencyDetection.computed();
 
                     if (isWith) {
                         childContext = bindingContext['createChildContext'](typeof value == "function" ? value : valueAccessor, contextOptions);
@@ -3132,12 +2778,8 @@ function makeWithIfBinding(bindingKey, isWith, isNot) {
                 } else {
                     ko.virtualElements.emptyNode(element);
 
-                    if (!completeOnRender) {
-                        ko.bindingEvent.notify(element, ko.bindingEvent.childrenComplete);
-                    }
+                    ko.bindingEvent.notify(element, ko.bindingEvent.childrenComplete);
                 }
-
-                didDisplayOnLastUpdate = shouldDisplay;
 
             }, { disposeWhenNodeIsRemoved: element });
 
@@ -3315,7 +2957,7 @@ ko.bindingHandlers['style'] = {
         ko.utils.objectForEach(value, (styleName, styleValue) => {
             styleValue = ko.utils.unwrapObservable(styleValue);
 
-            if (styleValue === null || styleValue === undefined || styleValue === false) {
+            if (styleValue == null || styleValue === false) {
                 // Empty string removes the value, whereas null/undefined have no effect
                 styleValue = "";
             }
@@ -3340,7 +2982,7 @@ ko.bindingHandlers['submit'] = {
     'init': (element, valueAccessor, allBindings, viewModel, bindingContext) => {
         if (typeof valueAccessor() != "function")
             throw new Error("The value for a submit binding must be a function");
-        ko.utils.registerEventHandler(element, "submit", event => {
+        element.addEventListener("submit", event => {
             var handlerReturnValue;
             var value = valueAccessor();
             try { handlerReturnValue = value.call(bindingContext['$data'], element); }
@@ -3361,8 +3003,13 @@ ko.bindingHandlers['text'] = {
         // It should also make things faster, as we no longer have to consider whether the text node might be bindable.
         return { 'controlsDescendantBindings': true };
     },
-    'update': (element, valueAccessor) =>
-        ko.utils.setTextContent(element, valueAccessor())
+    'update': (element, valueAccessor) => {
+        if (8 === element.nodeType) {
+            element.text || element.after(element.text = document.createTextNode(''));
+            element = element.text;
+        }
+        ko.utils.setTextContent(element, valueAccessor());
+    }
 };
 ko.virtualElements.allowedBindings['text'] = true;
 ko.bindingHandlers['textInput'] = {
@@ -3384,26 +3031,15 @@ ko.bindingHandlers['textInput'] = {
             }
         };
 
-        var deferUpdateModel = event => {
-            if (!timeoutHandle) {
-                // The elementValueBeforeEvent variable is set *only* during the brief gap between an
-                // event firing and the updateModel function running. This allows us to ignore model
-                // updates that are from the previous state of the element, usually due to techniques
-                // such as rateLimit. Such updates, if not ignored, can cause keystrokes to be lost.
-                elementValueBeforeEvent = element.value;
-                timeoutHandle = ko.utils.setTimeout(updateModel, 4);
-            }
-        };
-
         var updateView = () => {
             var modelValue = ko.utils.unwrapObservable(valueAccessor());
 
-            if (modelValue === null || modelValue === undefined) {
+            if (modelValue == null) {
                 modelValue = '';
             }
 
             if (elementValueBeforeEvent !== undefined && modelValue === elementValueBeforeEvent) {
-                ko.utils.setTimeout(updateView, 4);
+                setTimeout(updateView, 4);
                 return;
             }
 
@@ -3416,7 +3052,7 @@ ko.bindingHandlers['textInput'] = {
         };
 
         var onEvent = (event, handler) =>
-            ko.utils.registerEventHandler(element, event, handler);
+            element.addEventListener(event, handler);
 
         onEvent('input', updateModel);
 
@@ -3429,7 +3065,7 @@ ko.bindingHandlers['textInput'] = {
         ko.computed(updateView, { disposeWhenNodeIsRemoved: element });
     }
 };
-ko.expressionRewriting.twoWayBindings['textInput'] = true;
+ko.expressionRewriting.twoWayBindings.add('textInput');
 
 // textinput is an alias for textInput
 ko.bindingHandlers['textinput'] = {
@@ -3447,20 +3083,20 @@ ko.bindingHandlers['value'] = {
             return;
         }
 
-        var eventsToCatch = [];
+        var eventsToCatch = new Set;
         var requestedEventsToCatch = allBindings.get("valueUpdate");
         var elementValueBeforeEvent = null;
+        var registerEventHandler = (event, handler) =>
+            element.addEventListener(event, handler);
 
         if (requestedEventsToCatch) {
             // Allow both individual event names, and arrays of event names
             if (typeof requestedEventsToCatch == "string") {
-                eventsToCatch = [requestedEventsToCatch];
+                eventsToCatch.add(requestedEventsToCatch);
             } else {
-                eventsToCatch = requestedEventsToCatch ? requestedEventsToCatch.filter((item, index) =>
-                    requestedEventsToCatch.indexOf(item) === index
-                ) : [];
+                requestedEventsToCatch.forEach(item => eventsToCatch.add(item));
             }
-            ko.utils.arrayRemoveItem(eventsToCatch, "change");  // We'll subscribe to "change" events later
+            eventsToCatch.delete("change");  // We'll subscribe to "change" events later
         }
 
         var valueUpdateHandler = () => {
@@ -3475,7 +3111,7 @@ ko.bindingHandlers['value'] = {
             // This is useful, for example, to catch "keydown" events after the browser has updated the control
             // (otherwise, ko.selectExtensions.readValue(this) will receive the control's value *before* the key event)
             var handler = valueUpdateHandler;
-            if (ko.utils.stringStartsWith(eventName, "after")) {
+            if ((eventName||'').startsWith("after")) {
                 handler = () => {
                     // The elementValueBeforeEvent variable is non-null *only* during the brief gap between
                     // a keyX event firing and the valueUpdateHandler running, which is scheduled to happen
@@ -3485,11 +3121,11 @@ ko.bindingHandlers['value'] = {
                     // techniques like rateLimit can trigger model changes at critical moments that will
                     // override the user's inputs, causing keystrokes to be lost.
                     elementValueBeforeEvent = ko.selectExtensions.readValue(element);
-                    ko.utils.setTimeout(valueUpdateHandler, 0);
+                    setTimeout(valueUpdateHandler, 0);
                 };
-                eventName = eventName.substring("after".length);
+                eventName = eventName.substring(5);
             }
-            ko.utils.registerEventHandler(element, eventName, handler);
+            registerEventHandler(eventName, handler);
         });
 
         var updateFromModel;
@@ -3498,7 +3134,7 @@ ko.bindingHandlers['value'] = {
             // For file input elements, can only write the empty string
             updateFromModel = () => {
                 var newValue = ko.utils.unwrapObservable(valueAccessor());
-                if (newValue === null || newValue === undefined || newValue === "") {
+                if (newValue == null || newValue === "") {
                     element.value = "";
                 } else {
                     ko.dependencyDetection.ignore(valueUpdateHandler);  // reset the model to match the element
@@ -3510,7 +3146,7 @@ ko.bindingHandlers['value'] = {
                 var elementValue = ko.selectExtensions.readValue(element);
 
                 if (elementValueBeforeEvent !== null && newValue === elementValueBeforeEvent) {
-                    ko.utils.setTimeout(updateFromModel, 0);
+                    setTimeout(updateFromModel, 0);
                     return;
                 }
 
@@ -3536,7 +3172,7 @@ ko.bindingHandlers['value'] = {
             var updateFromModelComputed;
             ko.bindingEvent.subscribe(element, ko.bindingEvent.childrenComplete, () => {
                 if (!updateFromModelComputed) {
-                    ko.utils.registerEventHandler(element, "change", valueUpdateHandler);
+                    registerEventHandler("change", valueUpdateHandler);
                     updateFromModelComputed = ko.computed(updateFromModel, { disposeWhenNodeIsRemoved: element });
                 } else if (allBindings.get('valueAllowUnset')) {
                     updateFromModel();
@@ -3545,13 +3181,13 @@ ko.bindingHandlers['value'] = {
                 }
             }, null, { 'notifyImmediately': true });
         } else {
-            ko.utils.registerEventHandler(element, "change", valueUpdateHandler);
+            registerEventHandler("change", valueUpdateHandler);
             ko.computed(updateFromModel, { disposeWhenNodeIsRemoved: element });
         }
     },
     'update': () => {} // Keep for backwards compatibility with code that may have wrapped value binding
 };
-ko.expressionRewriting.twoWayBindings['value'] = true;
+ko.expressionRewriting.twoWayBindings.add('value');
 ko.bindingHandlers['visible'] = {
     'update': (element, valueAccessor) => {
         var value = ko.utils.unwrapObservable(valueAccessor());
@@ -3689,8 +3325,7 @@ makeEventHandlerShortcut('click');
                                         : null;
     }
 
-    function executeTemplate(targetNodeOrNodeArray, renderMode, template, bindingContext, options) {
-        options = options || {};
+    function executeTemplate(targetNodeOrNodeArray, renderMode, template, bindingContext) {
         var firstTargetNode = targetNodeOrNodeArray && getFirstNodeFromPossibleArray(targetNodeOrNodeArray);
         var templateDocument = (firstTargetNode || template || {}).ownerDocument;
 
@@ -3713,9 +3348,6 @@ makeEventHandlerShortcut('click');
 
         if (haveAddedNodesToParent) {
             activateBindingsOnContinuousNodeArray(renderedNodesArray, bindingContext);
-            if (options['afterRender']) {
-                ko.dependencyDetection.ignore(options['afterRender'], null, [renderedNodesArray, bindingContext[options['as'] || '$data']]);
-            }
             if (renderMode == "replaceChildren") {
                 ko.bindingEvent.notify(targetNodeOrNodeArray, ko.bindingEvent.childrenComplete);
             }
@@ -3770,7 +3402,6 @@ makeEventHandlerShortcut('click');
             // Support selecting template as a function of the data being rendered
             arrayItemContext = parentBindingContext['createChildContext'](arrayValue, {
                 'as': asName,
-                'noChildContext': options['noChildContext'],
                 'extend': context => {
                     context['$index'] = index;
                     if (asName) {
@@ -3786,8 +3417,6 @@ makeEventHandlerShortcut('click');
         // This will be called whenever setDomNodeChildrenFromArrayMapping has added nodes to targetNode
         var activateBindingsCallback = (arrayValue, addedNodesArray) => {
             activateBindingsOnContinuousNodeArray(addedNodesArray, arrayItemContext);
-            if (options['afterRender'])
-                options['afterRender'](addedNodesArray, arrayValue);
 
             // release the "cache" variable, so that it can be collected by
             // the GC when its value isn't used from within the bindings anymore.
@@ -3801,9 +3430,7 @@ makeEventHandlerShortcut('click');
             ko.bindingEvent.notify(targetNode, ko.bindingEvent.childrenComplete);
         };
 
-        var shouldHideDestroyed = (options['includeDestroyed'] === false);
-
-        if (!shouldHideDestroyed && !options['beforeRemove'] && ko.isObservableArray(arrayOrObservableArray)) {
+        if (!options['beforeRemove'] && ko.isObservableArray(arrayOrObservableArray)) {
             setDomNodeChildrenFromArrayMapping(arrayOrObservableArray.peek());
 
             var subscription = arrayOrObservableArray.subscribe(changeList => {
@@ -3818,10 +3445,6 @@ makeEventHandlerShortcut('click');
                 if (typeof unwrappedArray.length == "undefined") // Coerce single value into array
                     unwrappedArray = [unwrappedArray];
 
-                if (shouldHideDestroyed) {
-                    // Filter out any entries marked as destroyed
-                    unwrappedArray = unwrappedArray.filter(item => item || item == null);
-                }
                 setDomNodeChildrenFromArrayMapping(unwrappedArray);
 
             }, { disposeWhenNodeIsRemoved: targetNode });
@@ -3912,7 +3535,6 @@ makeEventHandlerShortcut('click');
                 if ('data' in options) {
                     innerBindingContext = bindingContext['createChildContext'](options['data'], {
                         'as': options['as'],
-                        'noChildContext': options['noChildContext'],
                         'exportDependencies': true
                     });
                 }
@@ -4100,23 +3722,16 @@ ko.utils.compareArrays = (() => {
         var nodesToDelete = [];
         var itemsToMoveFirstIndexes = [];
         var itemsForBeforeRemoveCallbacks = [];
-        var itemsForMoveCallbacks = [];
-        var itemsForAfterAddCallbacks = [];
         var mapData;
         var countWaitingForRemove = 0;
 
         function itemAdded(value) {
             mapData = { arrayEntry: value, indexObservable: ko.observable(currentArrayIndex++) };
             newMappingResult.push(mapData);
-            if (!isFirstExecution) {
-                itemsForAfterAddCallbacks.push(mapData);
-            }
         }
 
         function itemMovedOrRetained(oldPosition) {
             mapData = lastMappingResult[oldPosition];
-            if (currentArrayIndex !== mapData.indexObservable.peek())
-                itemsForMoveCallbacks.push(mapData);
             // Since updating the index might change the nodes, do so before calling fixUpContinuousNodeArray
             mapData.indexObservable(currentArrayIndex++);
             ko.utils.fixUpContinuousNodeArray(mapData.mappedNodes, domNode);
@@ -4126,7 +3741,7 @@ ko.utils.compareArrays = (() => {
         function callCallback(callback, items) {
             if (callback) {
                 for (var i = 0, n = items.length; i < n; i++) {
-                    items[i].mappedNodes.forEach(node => callback(node, i, items[i].arrayEntry));
+                    items[i] && items[i].mappedNodes.forEach(node => callback(node, i, items[i].arrayEntry));
                 }
             }
         }
@@ -4169,7 +3784,7 @@ ko.utils.compareArrays = (() => {
                                     if (mapData.arrayEntry === deletedItemDummyValue) {
                                         mapData = null;
                                     } else {
-                                        itemsForBeforeRemoveCallbacks.push(mapData);
+                                        itemsForBeforeRemoveCallbacks[mapData.indexObservable.peek()] = mapData;
                                     }
                                 }
                                 if (mapData) {
@@ -4206,9 +3821,6 @@ ko.utils.compareArrays = (() => {
         // Store a copy of the array items we just considered so we can difference it next time
         ko.utils.domData.set(domNode, lastMappingResultDomDataKey, newMappingResult);
 
-        // Call beforeMove first before any changes have been made to the DOM
-        callCallback(options['beforeMove'], itemsForMoveCallbacks);
-
         // Next remove nodes for deleted items (or just clean if there's a beforeRemove callback)
         nodesToDelete.forEach(options['beforeRemove'] ? ko.cleanNode : ko.removeNode);
 
@@ -4224,7 +3836,7 @@ ko.utils.compareArrays = (() => {
                 mapData = newMappingResult[i];
                 for (lastNode = undefined; i; ) {
                     if ((mappedNodes = newMappingResult[--i].mappedNodes) && mappedNodes.length) {
-                        lastNode = mappedNodes[mappedNodes.length-1];
+                        lastNode = mappedNodes[mappedNodes.length - 1];
                         break;
                     }
                 }
@@ -4269,14 +3881,11 @@ ko.utils.compareArrays = (() => {
         // as already "removed" so we won't call beforeRemove for it again, and it ensures that the item won't match up
         // with an actual item in the array and appear as "retained" or "moved".
         for (i = 0; i < itemsForBeforeRemoveCallbacks.length; ++i) {
-            itemsForBeforeRemoveCallbacks[i].arrayEntry = deletedItemDummyValue;
+            if (itemsForBeforeRemoveCallbacks[i]) {
+                itemsForBeforeRemoveCallbacks[i].arrayEntry = deletedItemDummyValue;
+            }
         }
-
-        // Finally call afterMove and afterAdd callbacks
-        callCallback(options['afterMove'], itemsForMoveCallbacks);
-        callCallback(options['afterAdd'], itemsForAfterAddCallbacks);
     }
 })();
 	window['ko'] = koExports;
 })(this);
-})();

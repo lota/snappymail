@@ -10,7 +10,7 @@ import { ThemeStore } from 'Stores/Theme';
 
 import Remote from 'Remote/User/Fetch';
 
-export class ThemesUserSettings {
+export class ThemesUserSettings /*extends AbstractViewSettings*/ {
 	constructor() {
 		this.theme = ThemeStore.theme;
 		this.themes = ThemeStore.themes;
@@ -52,30 +52,12 @@ export class ThemesUserSettings {
 			}))
 		);
 
-		this.initUploader();
-	}
+		// initUploader
 
-	onShow() {
-		this.background.error('');
-	}
-
-	clearBackground() {
-		if (this.capaUserBackground()) {
-			Remote.clearUserBackground(() => {
-				this.background.name('');
-				this.background.hash('');
-			});
-		}
-	}
-
-	initUploader() {
 		if (this.background.uploaderButton() && this.capaUserBackground()) {
 			const oJua = new Jua({
 				action: serverRequest('UploadBackground'),
-				name: 'uploader',
-				queueSize: 1,
-				multipleSizeLimit: 1,
-				disableMultiple: true,
+				limit: 1,
 				clickElement: this.background.uploaderButton()
 			});
 
@@ -117,6 +99,19 @@ export class ThemesUserSettings {
 
 					return true;
 				});
+		}
+	}
+
+	onShow() {
+		this.background.error('');
+	}
+
+	clearBackground() {
+		if (this.capaUserBackground()) {
+			Remote.clearUserBackground(() => {
+				this.background.name('');
+				this.background.hash('');
+			});
 		}
 	}
 }

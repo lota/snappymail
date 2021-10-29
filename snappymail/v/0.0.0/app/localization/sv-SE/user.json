@@ -145,7 +145,8 @@
 		"PGP_SIGNED_MESSAGE_DESC": "OpenPGP-signerat meddelande (klicka för att verifiera)",
 		"PGP_ENCRYPTED_MESSAGE_DESC": "OpenPGP-krypterat meddelande (klicka för att dekryptera)",
 		"LINK_DOWNLOAD_AS_ZIP": "Ladda ner som ZIP-fil",
-		"SPAM_SCORE": "Spam Score"
+		"SPAM_SCORE": "Spam Score",
+		"HAS_VIRUS_WARNING": "VARNING: virus upptäckt"
 	},
 	"READ_RECEIPT": {
 		"SUBJECT": "Mottagar kvitto (visad) - %SUBJECT%",
@@ -354,7 +355,6 @@
 		"LABEL_ACCOUNTS_NAME": "Konton",
 		"LABEL_IDENTITIES_NAME": "Identiteter",
 		"LABEL_FILTERS_NAME": "Filter",
-		"LABEL_TEMPLATES_NAME": "Templates",
 		"LABEL_SECURITY_NAME": "Säkerhet",
 		"LABEL_THEMES_NAME": "Teman"
 	},
@@ -396,6 +396,8 @@
 		"LABEL_SHOW_IMAGES": "Visa alltid bilder i mail",
 		"LABEL_REMOVE_COLORS": "Remove background and text colors from message body",
 		"LABEL_MESSAGE_PER_PAGE": "Meddelanden per sida",
+		"LABEL_MARK_MESSAGE_READ_AFTER": "Markera meddelandet som läst efter",
+		"SECONDS": "sekunder",
 		"LABEL_NOTIFICATIONS": "Aviseringar",
 		"LABEL_SOUND_NOTIFICATION": "Ljudnotifikation",
 		"LABEL_CHROME_NOTIFICATION_DESC": "Visa nya meddelande-aviseringar som popup-fönster",
@@ -436,7 +438,14 @@
 		"HELP_DELETE_FOLDER": "Ta bort mapp",
 		"HELP_SHOW_HIDE_FOLDER": "Visa\/dölj mapp",
 		"HELP_CHECK_FOR_NEW_MESSAGES": "Kontrollera\/inte söka efter nya meddelanden",
-		"HIDE_UNSUBSCRIBED": "Hide unsubscribed folders"
+		"HIDE_UNSUBSCRIBED": "Hide unsubscribed folders",
+		"TYPE_CALENDAR": "Kalender",
+		"TYPE_CONFIGURATION": "Konfiguration",
+		"TYPE_CONTACTS": "Kontakter",
+		"TYPE_FILES": "Filer",
+		"TYPE_JOURNAL": "Journal",
+		"TYPE_NOTES": "Anteckningar",
+		"TYPE_TASKS": "Uppgifter"
 	},
 	"SETTINGS_ACCOUNTS": {
 		"LEGEND_ACCOUNTS": "Kontolista",

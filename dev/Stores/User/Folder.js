@@ -2,10 +2,10 @@ import ko from 'ko';
 
 import { FolderType, FolderSortMode } from 'Common/EnumsUser';
 import { UNUSED_OPTION_VALUE } from 'Common/Consts';
-import { addObservablesTo, addSubscribablesTo } from 'Common/Utils';
-import { folderListOptionsBuilder } from 'Common/UtilsUser';
+import { addObservablesTo, addSubscribablesTo, addComputablesTo } from 'Common/Utils';
 import { getFolderInboxName, getFolderFromCacheList } from 'Common/Cache';
-import { SettingsGet } from 'Common/Globals';
+import { Settings, SettingsGet } from 'Common/Globals';
+//import Remote from 'Remote/User/Fetch'; Circular dependency
 
 export const FolderUserStore = new class {
 	constructor() {
@@ -20,9 +20,11 @@ export const FolderUserStore = new class {
 			displaySpecSetting: false,
 
 			/**
-			 * If the IMAP server supports SORT
+			 * If the IMAP server supports SORT, METADATA
 			 */
 			sortSupported: false,
+			metadataSupported: false,
+			listStatusSupported: false,
 //			sortMode: '',
 
 			sentFolder: '',
@@ -52,95 +54,40 @@ export const FolderUserStore = new class {
 
 		this.sieveAllowFileintoInbox = !!SettingsGet('SieveAllowFileintoInbox');
 
-		this.draftFolderNotEnabled = ko.computed(
-			() => !this.draftFolder() || UNUSED_OPTION_VALUE === this.draftFolder()
-		);
+		addComputablesTo(this, {
 
-		this.foldersListWithSingleInboxRootFolder = ko.computed(
-			() => !this.folderList.find(folder => folder && !folder.isSystemFolder() && folder.visible())
-		);
+			draftFolderNotEnabled: () => !this.draftFolder() || UNUSED_OPTION_VALUE === this.draftFolder(),
 
-		this.currentFolderFullNameRaw = ko.computed(() => (this.currentFolder() ? this.currentFolder().fullNameRaw : ''));
+			currentFolderFullNameRaw: () => (this.currentFolder() ? this.currentFolder().fullNameRaw : ''),
 
-		this.currentFolderFullName = ko.computed(() => (this.currentFolder() ? this.currentFolder().fullName : ''));
-		this.currentFolderFullNameHash = ko.computed(() => (this.currentFolder() ? this.currentFolder().fullNameHash : ''));
+			currentFolderFullName: () => (this.currentFolder() ? this.currentFolder().fullName : ''),
+			currentFolderFullNameHash: () => (this.currentFolder() ? this.currentFolder().fullNameHash : ''),
 
-		this.foldersChanging = ko.computed(() => {
-			const loading = this.foldersLoading(),
-				creating = this.foldersCreating(),
-				deleting = this.foldersDeleting(),
-				renaming = this.foldersRenaming();
+			foldersChanging: () =>
+				this.foldersLoading() | this.foldersCreating() | this.foldersDeleting() | this.foldersRenaming(),
 
-			return loading || creating || deleting || renaming;
+			folderListSystemNames: () => {
+				const list = [getFolderInboxName()],
+				others = [this.sentFolder(), this.draftFolder(), this.spamFolder(), this.trashFolder(), this.archiveFolder()];
+
+				this.folderList().length &&
+					others.forEach(name => name && UNUSED_OPTION_VALUE !== name && list.push(name));
+
+				return list;
+			},
+
+			folderListSystem: () =>
+				this.folderListSystemNames().map(name => getFolderFromCacheList(name)).filter(v => v)
 		});
-
-		this.folderListSystemNames = ko.computed(() => {
-			const list = [getFolderInboxName()],
-				sentFolder = this.sentFolder(),
-				draftFolder = this.draftFolder(),
-				spamFolder = this.spamFolder(),
-				trashFolder = this.trashFolder(),
-				archiveFolder = this.archiveFolder();
-
-			if (this.folderList.length) {
-				if (sentFolder && UNUSED_OPTION_VALUE !== sentFolder) {
-					list.push(sentFolder);
-				}
-				if (draftFolder && UNUSED_OPTION_VALUE !== draftFolder) {
-					list.push(draftFolder);
-				}
-				if (spamFolder && UNUSED_OPTION_VALUE !== spamFolder) {
-					list.push(spamFolder);
-				}
-				if (trashFolder && UNUSED_OPTION_VALUE !== trashFolder) {
-					list.push(trashFolder);
-				}
-				if (archiveFolder && UNUSED_OPTION_VALUE !== archiveFolder) {
-					list.push(archiveFolder);
-				}
-			}
-
-			return list;
-		});
-
-		this.folderListSystem = ko.computed(() =>
-			this.folderListSystemNames().map(name => getFolderFromCacheList(name)).filter(v => v)
-		);
-
-		this.folderMenuForMove = ko.computed(() =>
-			folderListOptionsBuilder(
-				this.folderListSystem(),
-				this.folderList(),
-				[this.currentFolderFullNameRaw()],
-				[],
-				null,
-				(item) => (item ? item.localName() : '')
-			)
-		);
-
-		this.folderMenuForFilters = ko.computed(() =>
-			folderListOptionsBuilder(
-				this.folderListSystem(),
-				this.folderList(),
-				[this.sieveAllowFileintoInbox ? '' : 'INBOX'],
-				[['', '']],
-				null,
-				(item) => (item ? item.localName() : '')
-			)
-		);
 
 		const
 			fRemoveSystemFolderType = (observable) => () => {
 				const folder = getFolderFromCacheList(observable());
-				if (folder) {
-					folder.type(FolderType.User);
-				}
+				folder && folder.type(FolderType.User);
 			},
 			fSetSystemFolderType = type => value => {
 				const folder = getFolderFromCacheList(value);
-				if (folder) {
-					folder.type(type);
-				}
+				folder && folder.type(type);
 			};
 
 		this.sentFolder.subscribe(fRemoveSystemFolderType(this.sentFolder), this, 'beforeChange');
@@ -150,8 +97,8 @@ export const FolderUserStore = new class {
 		this.archiveFolder.subscribe(fRemoveSystemFolderType(this.archiveFolder), this, 'beforeChange');
 
 		addSubscribablesTo(this, {
-			sentFolder: fSetSystemFolderType(FolderType.SentItems),
-			draftFolder: fSetSystemFolderType(FolderType.Draft),
+			sentFolder: fSetSystemFolderType(FolderType.Sent),
+			draftFolder: fSetSystemFolderType(FolderType.Drafts),
 			spamFolder: fSetSystemFolderType(FolderType.Spam),
 			trashFolder: fSetSystemFolderType(FolderType.Trash),
 			archiveFolder: fSetSystemFolderType(FolderType.Archive)
@@ -172,7 +119,7 @@ export const FolderUserStore = new class {
 				list.forEach(folder => {
 					if (
 						folder &&
-						folder.selectable &&
+						folder.selectable() &&
 						folder.exists &&
 						timeout > folder.expires &&
 						(folder.isSystemFolder() || (folder.subscribed() && (folder.checkable() || !bDisplaySpecSetting)))
@@ -201,5 +148,17 @@ export const FolderUserStore = new class {
 		});
 
 		return result.filter((value, index, self) => self.indexOf(value) == index);
+	}
+
+	saveSystemFolders(folders) {
+		folders = folders || {
+			SentFolder: FolderUserStore.sentFolder(),
+			DraftFolder: FolderUserStore.draftFolder(),
+			SpamFolder: FolderUserStore.spamFolder(),
+			TrashFolder: FolderUserStore.trashFolder(),
+			ArchiveFolder: FolderUserStore.archiveFolder()
+		};
+		Object.entries(folders).forEach(([k,v])=>Settings.set(k,v));
+		rl.app.Remote.saveSystemFolders(()=>0, folders);
 	}
 };

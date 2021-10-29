@@ -17,12 +17,7 @@ import { PaneSettingsAdminView } from 'View/Admin/Settings/Pane';
 export class SettingsAdminScreen extends AbstractSettingsScreen {
 	constructor() {
 		super([MenuSettingsAdminView, PaneSettingsAdminView]);
-	}
 
-	/**
-	 * @param {Function=} fCallback = null
-	 */
-	setupSettings(fCallback = null) {
 		settingsAddViewModel(
 			GeneralAdminSettings,
 			'AdminSettingsGeneral',
@@ -49,8 +44,6 @@ export class SettingsAdminScreen extends AbstractSettingsScreen {
 		);
 
 		runSettingsViewModelHooks(true);
-
-		fCallback && fCallback();
 	}
 
 	onShow() {

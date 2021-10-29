@@ -14,7 +14,6 @@ trait User
 	use Filters;
 	use Folders;
 	use Messages;
-	use Templates;
 
 	/**
 	 * @throws \MailSo\Base\Exceptions\Exception
@@ -108,7 +107,7 @@ trait User
 			{
 				case 'zip':
 
-					$sZipHash = \MailSo\Base\Utils::Md5Rand();
+					$sZipHash = \MailSo\Base\Utils::Sha1Rand();
 					$sZipFileName = $oFilesProvider->GenerateLocalFullFileName($oAccount, $sZipHash);
 
 					if (!empty($sZipFileName)) {
@@ -298,10 +297,6 @@ trait User
 	public function DoSettingsUpdate() : array
 	{
 		$oAccount = $this->getAccountFromToken();
-		if (!$this->GetCapa(false, Capa::SETTINGS, $oAccount))
-		{
-			return $this->FalseResponse(__FUNCTION__);
-		}
 
 		$self = $this;
 		$oConfig = $this->Config();
@@ -351,6 +346,7 @@ trait User
 		$this->setSettingsFromParams($oSettings, 'UseCheckboxesInList', 'bool');
 		$this->setSettingsFromParams($oSettings, 'AllowDraftAutosave', 'bool');
 		$this->setSettingsFromParams($oSettings, 'AutoLogout', 'int');
+		$this->setSettingsFromParams($oSettings, 'MessageReadDelay', 'int');
 
 		$this->setSettingsFromParams($oSettingsLocal, 'UseThreads', 'bool');
 		$this->setSettingsFromParams($oSettingsLocal, 'ReplySameFolder', 'bool');
@@ -372,7 +368,7 @@ trait User
 
 		try
 		{
-			$aQuota = $this->MailClient()->Quota();
+			$aQuota = $this->MailClient()->QuotaRoot();
 		}
 		catch (\Throwable $oException)
 		{
@@ -519,7 +515,7 @@ trait User
 			$this->SettingsProvider()->Save($oAccount, $oSettings) : false);
 	}
 
-	protected function ClearSignMeData(Model\Account $oAccount) : void
+	protected function ClearSignMeData(\RainLoop\Model\Account $oAccount) : void
 	{
 		if ($oAccount) {
 			Utils::ClearCookie(self::AUTH_SIGN_ME_TOKEN_KEY);
@@ -532,7 +528,7 @@ trait User
 
 	private function generateSignMeToken(string $sEmail) : string
 	{
-		return \MailSo\Base\Utils::Md5Rand(APP_SALT.$sEmail);
+		return \MailSo\Base\Utils::Sha1Rand(APP_SALT.$sEmail);
 	}
 
 	private function getMimeFileByHash(\RainLoop\Model\Account $oAccount, string $sHash) : array
@@ -540,7 +536,7 @@ trait User
 		$aValues = $this->getDecodedRawKeyValue($sHash);
 
 		$sFolder = isset($aValues['Folder']) ? $aValues['Folder'] : '';
-		$iUid = (int) isset($aValues['Uid']) ? $aValues['Uid'] : 0;
+		$iUid = isset($aValues['Uid']) ? (int) $aValues['Uid'] : 0;
 		$sMimeIndex = (string) isset($aValues['MimeIndex']) ? $aValues['MimeIndex'] : '';
 
 		$sContentTypeIn = (string) isset($aValues['MimeType']) ? $aValues['MimeType'] : '';
@@ -557,7 +553,7 @@ trait User
 
 				if ($oAccount && \is_resource($rResource))
 				{
-					$sHash = \MailSo\Base\Utils::Md5Rand($sFileNameIn.'~'.$sContentTypeIn);
+					$sHash = \MailSo\Base\Utils::Sha1Rand($sFileNameIn.'~'.$sContentTypeIn);
 					$rTempResource = $oFileProvider->GetFile($oAccount, $sHash, 'wb+');
 
 					if (\is_resource($rTempResource))

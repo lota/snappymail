@@ -10,6 +10,15 @@ use \MailSo\Imap\Enumerations\FolderType;
 trait Folders
 {
 
+	private function getFolderCollection(bool $HideUnsubscribed) : ?\MailSo\Mail\FolderCollection
+	{
+		return $this->MailClient()->Folders('', '*',
+			$HideUnsubscribed,
+			(int) $this->Config()->Get('labs', 'imap_folder_list_limit', 200),
+			(bool) $this->Config()->Get('labs', 'imap_use_list_status', true)
+		);
+	}
+
 	public function DoFolders() : array
 	{
 		$oAccount = $this->initMailClientConnection();
@@ -20,13 +29,9 @@ trait Folders
 			$HideUnsubscribed = (bool) $oSettingsLocal->GetConf('HideUnsubscribed', $HideUnsubscribed);
 		}
 
-		$oFolderCollection = $this->MailClient()->Folders('',
-			'*',
-			$HideUnsubscribed,
-			(int) $this->Config()->Get('labs', 'imap_folder_list_limit', 200)
-		);
+		$oFolderCollection = $this->getFolderCollection($HideUnsubscribed);
 
-		if ($oFolderCollection instanceof \MailSo\Mail\FolderCollection)
+		if ($oFolderCollection)
 		{
 			$this->Plugins()->RunHook('filter.folders-post', array($oAccount, $oFolderCollection));
 
@@ -70,7 +75,7 @@ trait Folders
 
 				if ('' === $oSettingsLocal->GetConf('ArchiveFolder', ''))
 				{
-					$aList[] = FolderType::ALL;
+					$aList[] = FolderType::ARCHIVE;
 				}
 
 				$this->Plugins()->RunHook('filter.folders-system-types', array($oAccount, &$aList));
@@ -126,10 +131,7 @@ trait Folders
 
 				if ($bDoItAgain)
 				{
-					$oFolderCollection = $this->MailClient()->Folders('', '*',
-						$HideUnsubscribed,
-						(int) $this->Config()->Get('labs', 'imap_folder_list_limit', 200)
-					);
+					$oFolderCollection = $this->getFolderCollection($HideUnsubscribed);
 
 					if ($oFolderCollection)
 					{
@@ -153,7 +155,7 @@ trait Folders
 
 	public function DoFolderCreate() : array
 	{
-		$oAccount = $this->initMailClientConnection();
+		$this->initMailClientConnection();
 
 		try
 		{
@@ -171,16 +173,29 @@ trait Folders
 		return $this->TrueResponse(__FUNCTION__);
 	}
 
+	public function DoFolderSetMetadata() : array
+	{
+		$this->initMailClientConnection();
+		$sFolderFullNameRaw = $this->GetActionParam('Folder');
+		$sMetadataKey = $this->GetActionParam('Key');
+		if ($sFolderFullNameRaw && $sMetadataKey) {
+			$this->MailClient()->FolderSetMetadata($sFolderFullNameRaw, [
+				$sMetadataKey => $this->GetActionParam('Value') ?: null
+			]);
+		}
+		return $this->TrueResponse(__FUNCTION__);
+	}
+
 	public function DoFolderSubscribe() : array
 	{
-		$oAccount = $this->initMailClientConnection();
+		$this->initMailClientConnection();
 
 		$sFolderFullNameRaw = $this->GetActionParam('Folder', '');
 		$bSubscribe = '1' === (string) $this->GetActionParam('Subscribe', '0');
 
 		try
 		{
-			$this->MailClient()->FolderSubscribe($sFolderFullNameRaw, !!$bSubscribe);
+			$this->MailClient()->FolderSubscribe($sFolderFullNameRaw, $bSubscribe);
 		}
 		catch (\Throwable $oException)
 		{
@@ -244,7 +259,7 @@ trait Folders
 	 */
 	public function DoFolderMove() : array
 	{
-		$oAccount = $this->initMailClientConnection();
+		$this->initMailClientConnection();
 
 		try
 		{
@@ -267,7 +282,7 @@ trait Folders
 	 */
 	public function DoFolderRename() : array
 	{
-		$oAccount = $this->initMailClientConnection();
+		$this->initMailClientConnection();
 
 		try
 		{
@@ -290,7 +305,7 @@ trait Folders
 	 */
 	public function DoFolderDelete() : array
 	{
-		$oAccount = $this->initMailClientConnection();
+		$this->initMailClientConnection();
 
 		try
 		{
@@ -336,16 +351,8 @@ trait Folders
 	public function DoFolderInformation() : array
 	{
 		$sFolder = $this->GetActionParam('Folder', '');
-		$sPrevUidNext = $this->GetActionParam('UidNext', '');
-		$aFlagsUids = array();
-		$sFlagsUids = (string) $this->GetActionParam('FlagsUids', '');
-
-		$aFlagsFilteredUids = array();
-		if (0 < strlen($sFlagsUids))
-		{
-			$aFlagsUids = \explode(',', $sFlagsUids);
-			$aFlagsFilteredUids = \array_filter(\array_map('intval', $aFlagsUids));
-		}
+		$iPrevUidNext = (int) $this->GetActionParam('UidNext', 0);
+		$aFlagsUids = \array_filter(\array_map('intval', $this->GetActionParam('FlagsUids', []) ?: []));
 
 		$this->initMailClientConnection();
 
@@ -354,25 +361,25 @@ trait Folders
 		try
 		{
 			$aInboxInformation = $this->MailClient()->FolderInformation(
-				$sFolder, $sPrevUidNext, $aFlagsFilteredUids
+				$sFolder, $iPrevUidNext, $aFlagsUids
 			);
-
-			if (isset($aInboxInformation['Flags']) && \is_array($aInboxInformation['Flags']))
+			foreach ($aInboxInformation['MessageFlags'] as $iUid => $aFlags)
 			{
-				foreach ($aInboxInformation['Flags'] as $iUid => $aFlags)
-				{
-					$aLowerFlags = array_map('strtolower', $aFlags);
-					$aInboxInformation['Flags'][$iUid] = array(
-						'IsUnseen' => \in_array('\\unseen', $aLowerFlags) || !\in_array('\\seen', $aLowerFlags),
-						'IsSeen' => in_array('\\seen', $aLowerFlags),
-						'IsFlagged' => in_array('\\flagged', $aLowerFlags),
-						'IsAnswered' => in_array('\\answered', $aLowerFlags),
-						'IsDeleted' => in_array('\\deleted', $aLowerFlags),
-						'IsForwarded' => 0 < strlen($sForwardedFlag) && in_array(strtolower($sForwardedFlag), $aLowerFlags),
-						'IsReadReceipt' => 0 < strlen($sReadReceiptFlag) && in_array(strtolower($sReadReceiptFlag), $aLowerFlags)
-					);
-				}
+				$aLowerFlags = \array_map('strtolower', $aFlags);
+				$aInboxInformation['Flags'][$iUid] = array(
+					'Uid' => $iUid,
+					'IsUnseen' => \in_array('\\unseen', $aLowerFlags) || !\in_array('\\seen', $aLowerFlags),
+					'IsSeen' => \in_array('\\seen', $aLowerFlags),
+					'IsFlagged' => \in_array('\\flagged', $aLowerFlags),
+					'IsAnswered' => \in_array('\\answered', $aLowerFlags),
+					'IsDeleted' => \in_array('\\deleted', $aLowerFlags),
+					'IsForwarded' => \in_array(\strtolower('$Forwarded'), $aLowerFlags) || ($sForwardedFlag && \in_array(\strtolower($sForwardedFlag), $aLowerFlags)),
+					'IsReadReceipt' => \in_array(\strtolower('$MDNSent'), $aLowerFlags) || ($sReadReceiptFlag && \in_array(\strtolower($sReadReceiptFlag), $aLowerFlags)),
+					'IsJunk' => !\in_array(\strtolower('$NonJunk'), $aLowerFlags) && \in_array(\strtolower('$Junk'), $aLowerFlags),
+					'IsPhishing' => \in_array(\strtolower('$Phishing'), $aLowerFlags)
+				);
 			}
+			$aInboxInformation['Flags'] = \array_values($aInboxInformation['MessageFlags']);
 		}
 		catch (\Throwable $oException)
 		{
@@ -402,14 +409,19 @@ trait Folders
 			$aFolders = \array_unique($aFolders);
 			foreach ($aFolders as $sFolder)
 			{
-				if (0 < \strlen(\trim($sFolder)) && 'INBOX' !== \strtoupper($sFolder))
+				if (\strlen($sFolder) && 'INBOX' !== \strtoupper($sFolder))
 				{
 					try
 					{
-						$aInboxInformation = $this->MailClient()->FolderInformation($sFolder, '', array());
+						$aInboxInformation = $this->MailClient()->FolderInformation($sFolder);
 						if (isset($aInboxInformation['Folder']))
 						{
-							$aResult['List'][] = $aInboxInformation;
+							$aResult['List'][] = [
+								'Folder' => $aInboxInformation['Folder'],
+								'Hash' => $aInboxInformation['Hash'],
+								'MessageCount' => $aInboxInformation['MessageCount'],
+								'MessageUnseenCount' => $aInboxInformation['MessageUnseenCount'],
+							];
 						}
 					}
 					catch (\Throwable $oException)
@@ -447,7 +459,7 @@ trait Folders
 			foreach ($oFolders as $oFolder)
 			{
 				$aResult[] = $oFolder->FullNameRaw()."|".
-					implode("|", $oFolder->Flags()).($oFolder->IsSubscribed() ? '1' : '0');
+					implode("|", $oFolder->FlagsLowerCase()).($oFolder->IsSubscribed() ? '1' : '0');
 
 				$oSub = $oFolder->SubFolders();
 				if ($oSub && 0 < $oSub->Count())
@@ -475,7 +487,7 @@ trait Folders
 						FolderType::DRAFTS,
 						FolderType::JUNK,
 						FolderType::TRASH,
-						FolderType::ALL
+						FolderType::ARCHIVE
 					)))
 					{
 						$aResult[$iFolderType] = $oFolder->FullNameRaw();
@@ -507,7 +519,7 @@ trait Folders
 						FolderType::DRAFTS,
 						FolderType::JUNK,
 						FolderType::TRASH,
-						FolderType::ALL
+						FolderType::ARCHIVE
 					)))
 					{
 						$aResult[$iFolderType] = $oFolder->FullNameRaw();
@@ -574,8 +586,8 @@ trait Folders
 				'Deleted' => FolderType::TRASH,
 				'Bin' => FolderType::TRASH,
 
-				'Archive' => FolderType::ALL,
-				'Archives' => FolderType::ALL,
+				'Archive' => FolderType::ARCHIVE,
+				'Archives' => FolderType::ARCHIVE,
 
 				'All' => FolderType::ALL,
 				'All Mail' => FolderType::ALL,

@@ -145,7 +145,8 @@
 		"PGP_SIGNED_MESSAGE_DESC": "Mensaje firmado mediante OpenPGP  (click para verificar)",
 		"PGP_ENCRYPTED_MESSAGE_DESC": "Mensaje cifrado mediante OpenPGP (click para desencriptar)",
 		"LINK_DOWNLOAD_AS_ZIP": "Descargar todo (archivo ZIP)",
-		"SPAM_SCORE": "Puntuación de spam"
+		"SPAM_SCORE": "Puntuación de spam",
+		"HAS_VIRUS_WARNING": "ADVERTENCIA: virus detectado"
 	},
 	"READ_RECEIPT": {
 		"SUBJECT": "Acuse de recibo (se visualiza) - %SUBJECT%",
@@ -354,7 +355,6 @@
 		"LABEL_ACCOUNTS_NAME": "Cuentas",
 		"LABEL_IDENTITIES_NAME": "Identidades",
 		"LABEL_FILTERS_NAME": "Filtros",
-		"LABEL_TEMPLATES_NAME": "Plantillas",
 		"LABEL_SECURITY_NAME": "Seguridad",
 		"LABEL_THEMES_NAME": "Temas"
 	},
@@ -396,6 +396,8 @@
 		"LABEL_SHOW_IMAGES": "Mostrar siempre las imágenes en el cuerpo del mensaje",
 		"LABEL_REMOVE_COLORS": "Eliminar el fondo y los colores del texto del mensaje",
 		"LABEL_MESSAGE_PER_PAGE": "Mensajes en página",
+		"LABEL_MARK_MESSAGE_READ_AFTER": "Marcar el mensaje como leído después de",
+		"SECONDS": "segundos",
 		"LABEL_NOTIFICATIONS": "Notificaciones",
 		"LABEL_SOUND_NOTIFICATION": "Sonido de la notificación",
 		"LABEL_CHROME_NOTIFICATION_DESC": "Mostrar notificación de nuevos mensajes en Popup",
@@ -436,7 +438,14 @@
 		"HELP_DELETE_FOLDER": "Eliminar carpeta",
 		"HELP_SHOW_HIDE_FOLDER": "Mostrar\/ocultar carpeta",
 		"HELP_CHECK_FOR_NEW_MESSAGES": "Chequear\/no chequear nuevos mensajes",
-		"HIDE_UNSUBSCRIBED": "Ocultar carpetas dadas de baja"
+		"HIDE_UNSUBSCRIBED": "Ocultar carpetas dadas de baja",
+		"TYPE_CALENDAR": "Calendario",
+		"TYPE_CONFIGURATION": "Configuración",
+		"TYPE_CONTACTS": "Contactos",
+		"TYPE_FILES": "Archivos",
+		"TYPE_JOURNAL": "Diario",
+		"TYPE_NOTES": "Notas",
+		"TYPE_TASKS": "Tareas"
 	},
 	"SETTINGS_ACCOUNTS": {
 		"LEGEND_ACCOUNTS": "Lista de cuentas",

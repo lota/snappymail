@@ -1,6 +1,5 @@
 import ko from 'ko';
 
-import { MESSAGES_PER_PAGE_VALUES } from 'Common/Consts';
 import { Layout, EditorDefaultType } from 'Common/EnumsUser';
 import { pInt, addObservablesTo } from 'Common/Utils';
 import { $htmlCL, SettingsGet } from 'Common/Globals';
@@ -21,7 +20,9 @@ export const SettingsUserStore = new class {
 			]
 		});
 
-		this.messagesPerPage = ko.observable(SettingsGet('MPP')).extend({ limitedList: MESSAGES_PER_PAGE_VALUES });
+		this.messagesPerPage = ko.observable(pInt(SettingsGet('MPP'))).extend({ debounce: 999 });
+
+		this.messageReadDelay = ko.observable(pInt(SettingsGet('MessageReadDelay'))).extend({ debounce: 999 });
 
 		addObservablesTo(this, {
 			showImages: !!SettingsGet('ShowImages'),
@@ -31,7 +32,6 @@ export const SettingsUserStore = new class {
 			useThreads: !!SettingsGet('UseThreads'),
 			replySameFolder: !!SettingsGet('ReplySameFolder'),
 			hideUnsubscribed: !!SettingsGet('HideUnsubscribed'),
-
 			autoLogout: pInt(SettingsGet('AutoLogout'))
 		});
 

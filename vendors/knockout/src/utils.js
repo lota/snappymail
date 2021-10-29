@@ -1,36 +1,9 @@
 ko.utils = {
-    arrayRemoveItem: (array, itemToRemove) => {
-        var index = array.indexOf(itemToRemove);
-        if (index > 0) {
-            array.splice(index, 1);
-        }
-        else if (index === 0) {
-            array.shift();
-        }
-    },
-
-    extend: (target, source) => {
-        source && Object.entries(source).forEach(prop => target[prop[0]] = prop[1]);
-        return target;
-    },
+    extend: (target, source) => source ? Object.assign(target, source) : target,
 
     objectForEach: (obj, action) => obj && Object.entries(obj).forEach(prop => action(prop[0], prop[1])),
 
-    objectMap: (source, mapping, mappingOwner) => {
-        if (!source)
-            return source;
-        var target = {};
-        Object.entries(source).forEach(prop =>
-            target[prop[0]] = mapping.call(mappingOwner, prop[1], prop[0], source)
-        );
-        return target;
-    },
-
-    emptyDomNode: domNode => {
-        while (domNode.firstChild) {
-            ko.removeNode(domNode.firstChild);
-        }
-    },
+    emptyDomNode: domNode => [...domNode.childNodes].forEach(child => ko.removeNode(child)),
 
     moveCleanedNodesToContainerElement: nodes => {
         // Ensure it's a real array, as we're about to reparent the nodes and
@@ -39,7 +12,7 @@ ko.utils = {
         var templateDocument = (nodesArray[0] && nodesArray[0].ownerDocument) || document;
 
         var container = templateDocument.createElement('div');
-        nodes.forEach(node => container.append(ko.cleanNode(node)));
+        nodesArray.forEach(node => container.append(ko.cleanNode(node)));
         return container;
     },
 
@@ -81,7 +54,7 @@ ko.utils = {
             // Rule [B]
             while (continuousNodeArray.length > 1
                 && continuousNodeArray[continuousNodeArray.length - 1].parentNode !== parentNode)
-                continuousNodeArray.length--;
+                --continuousNodeArray.length;
 
             // Rule [C]
             if (continuousNodeArray.length > 1) {
@@ -103,41 +76,8 @@ ko.utils = {
                 string.trim() :
                 string.toString().replace(/^[\s\xa0]+|[\s\xa0]+$/g, ''),
 
-    stringStartsWith: (string, startsWith) => {
-        string = string || "";
-        if (startsWith.length > string.length)
-            return false;
-        return string.substring(0, startsWith.length) === startsWith;
-    },
-
-    domNodeIsContainedBy: (node, containedByNode) =>
-        containedByNode.contains(node.nodeType !== 1 ? node.parentNode : node),
-
-    domNodeIsAttachedToDocument: node => ko.utils.domNodeIsContainedBy(node, node.ownerDocument.documentElement),
-
-    catchFunctionErrors: delegate => {
-        return ko['onError'] ? function () {
-            try {
-                return delegate.apply(this, arguments);
-            } catch (e) {
-                ko['onError'] && ko['onError'](e);
-                throw e;
-            }
-        } : delegate;
-    },
-
-    setTimeout: (handler, timeout) => setTimeout(ko.utils.catchFunctionErrors(handler), timeout),
-
-    deferError: error => setTimeout(() => {
-            ko['onError'] && ko['onError'](error);
-            throw error;
-        }, 0),
-
-    registerEventHandler: (element, eventType, handler) => {
-        var wrappedHandler = ko.utils.catchFunctionErrors(handler);
-
-        element.addEventListener(eventType, wrappedHandler, false);
-    },
+    domNodeIsAttachedToDocument: node =>
+        node.ownerDocument.documentElement.contains(node.nodeType !== 1 ? node.parentNode : node),
 
     triggerEvent: (element, eventType) => {
         if (!(element && element.nodeType))

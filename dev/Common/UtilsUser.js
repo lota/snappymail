@@ -1,48 +1,18 @@
-import { ComposeType, FolderType } from 'Common/EnumsUser';
+import { ComposeType/*, FolderType*/ } from 'Common/EnumsUser';
 import { EmailModel } from 'Model/Email';
 import { encodeHtml } from 'Common/Html';
 import { isArray } from 'Common/Utils';
 import { createElement } from 'Common/Globals';
+import { FolderUserStore } from 'Stores/User/Folder';
+import { SettingsUserStore } from 'Stores/User/Settings';
 
 /**
  * @param {(string|number)} value
  * @param {boolean=} includeZero = true
  * @returns {boolean}
  */
-export function isPosNumeric(value, includeZero = true) {
-	return null != value && (includeZero ? /^[0-9]*$/ : /^[1-9]+[0-9]*$/).test(value.toString());
-}
-
-/**
- * @param {string} text
- * @param {number=} len = 100
- * @returns {string}
- */
-function splitPlainText(text, len = 100) {
-	let prefix = '',
-		subText = '',
-		result = text,
-		spacePos = 0,
-		newLinePos = 0;
-
-	while (result.length > len) {
-		subText = result.substr(0, len);
-		spacePos = subText.lastIndexOf(' ');
-		newLinePos = subText.lastIndexOf('\n');
-
-		if (-1 !== newLinePos) {
-			spacePos = newLinePos;
-		}
-
-		if (-1 === spacePos) {
-			spacePos = len;
-		}
-
-		prefix += subText.substr(0, spacePos) + '\n';
-		result = result.substr(spacePos + 1);
-	}
-
-	return prefix + result;
+export function isPosNumeric(value) {
+	return null != value && /^[0-9]*$/.test(value.toString());
 }
 
 /**
@@ -51,44 +21,41 @@ function splitPlainText(text, len = 100) {
  */
 export function htmlToPlain(html) {
 	let pos = 0,
-		limit = 0,
+		limit = 800,
 		iP1 = 0,
 		iP2 = 0,
 		iP3 = 0,
 		text = '';
 
-	const convertBlockquote = (blockquoteText) => {
-		blockquoteText = '> ' + blockquoteText.trim().replace(/\n/gm, '\n> ');
-		return blockquoteText.replace(/(^|\n)([> ]+)/gm, (...args) =>
-			args && 2 < args.length ? args[1] + args[2].replace(/[\s]/g, '').trim() + ' ' : ''
-		);
-	};
+	const
+		tpl = createElement('template'),
 
-	const convertDivs = (...args) => {
-		if (args && 1 < args.length) {
-			let divText = args[1].trim();
+		convertBlockquote = (blockquoteText) => {
+			blockquoteText = '> ' + blockquoteText.trim().replace(/\n/gm, '\n> ');
+			return blockquoteText.replace(/(^|\n)([> ]+)/gm, (...args) =>
+				args && 2 < args.length ? args[1] + args[2].replace(/[\s]/g, '').trim() + ' ' : ''
+			);
+		},
+
+		convertDivs = (...args) => {
+			let divText = 1 < args.length ? args[1].trim() : '';
 			if (divText.length) {
-				divText = divText.replace(/<div[^>]*>([\s\S\r\n]*)<\/div>/gim, convertDivs);
-				divText = '\n' + divText.trim() + '\n';
+				divText = '\n' + divText.replace(/<div[^>]*>([\s\S\r\n]*)<\/div>/gim, convertDivs).trim() + '\n';
 			}
 
 			return divText;
-		}
+		},
 
-		return '';
-	};
-
-	const
-		tpl = createElement('template'),
 		convertPre = (...args) =>
-			args && 1 < args.length
+			1 < args.length
 				? args[1]
 						.toString()
 						.replace(/[\n]/gm, '<br/>')
 						.replace(/[\r]/gm, '')
 				: '',
-		fixAttibuteValue = (...args) => (args && 1 < args.length ? '' + args[1] + encodeHtml(args[2]) : ''),
-		convertLinks = (...args) => (args && 1 < args.length ? args[1].trim() : '');
+		fixAttibuteValue = (...args) => (1 < args.length ? args[1] + encodeHtml(args[2]) : ''),
+
+		convertLinks = (...args) => (1 < args.length ? args[1].trim() : '');
 
 	tpl.innerHTML = html
 		.replace(/<p[^>]*><\/p>/gi, '')
@@ -114,34 +81,33 @@ export function htmlToPlain(html) {
 		.replace(/&quot;/gi, '"')
 		.replace(/<[^>]*>/gm, '');
 
-	text = splitPlainText(tpl.content.textContent
+	text = tpl.content.textContent;
+	if (text) {
+		text = text
 		.replace(/\n[ \t]+/gm, '\n')
 		.replace(/[\n]{3,}/gm, '\n\n')
 		.replace(/&gt;/gi, '>')
 		.replace(/&lt;/gi, '<')
 		.replace(/&amp;/gi, '&')
-	);
+		// wordwrap max line length 100
+		.match(/.{1,100}(\s|$)|\S+?(\s|$)/g).join('\n');
+	}
 
-	pos = 0;
-	limit = 800;
-
-	while (0 < limit) {
-		--limit;
+	while (0 < --limit) {
 		iP1 = text.indexOf('__bq__start__', pos);
-		if (-1 < iP1) {
-			iP2 = text.indexOf('__bq__start__', iP1 + 5);
-			iP3 = text.indexOf('__bq__end__', iP1 + 5);
-
-			if ((-1 === iP2 || iP3 < iP2) && iP1 < iP3) {
-				text = text.substr(0, iP1) + convertBlockquote(text.substring(iP1 + 13, iP3)) + text.substr(iP3 + 11);
-				pos = 0;
-			} else if (-1 < iP2 && iP2 < iP3) {
-				pos = iP2 - 1;
-			} else {
-				pos = 0;
-			}
-		} else {
+		if (0 > iP1) {
 			break;
+		}
+		iP2 = text.indexOf('__bq__start__', iP1 + 5);
+		iP3 = text.indexOf('__bq__end__', iP1 + 5);
+
+		if ((-1 === iP2 || iP3 < iP2) && iP1 < iP3) {
+			text = text.substr(0, iP1) + convertBlockquote(text.substring(iP1 + 13, iP3)) + text.substr(iP3 + 11);
+			pos = 0;
+		} else if (-1 < iP2 && iP2 < iP3) {
+			pos = iP2 - 1;
+		} else {
+			pos = 0;
 		}
 	}
 
@@ -212,111 +178,64 @@ rl.Utils = {
 };
 
 /**
- * @param {Array} aSystem
- * @param {Array} aList
  * @param {Array=} aDisabled
  * @param {Array=} aHeaderLines
  * @param {Function=} fDisableCallback
  * @param {Function=} fRenameCallback
- * @param {boolean=} bSystem
- * @param {boolean=} bBuildUnvisible
+ * @param {boolean=} bNoSelectSelectable Used in FolderCreatePopupView
  * @returns {Array}
  */
 export function folderListOptionsBuilder(
-	aSystem,
-	aList,
 	aDisabled,
 	aHeaderLines,
-	fDisableCallback,
 	fRenameCallback,
-	bSystem,
-	bBuildUnvisible
+	fDisableCallback,
+	bNoSelectSelectable,
+	aList = FolderUserStore.folderList()
 ) {
-	let /**
-		 * @type {?FolderModel}
-		 */
-		bSep = false,
-		aResult = [];
+	const
+		aResult = [],
+		sDeepPrefix = '\u00A0\u00A0\u00A0',
+		// FolderSystemPopupView should always be true
+		showUnsubscribed = fRenameCallback ? !SettingsUserStore.hideUnsubscribed() : true,
 
-	const sDeepPrefix = '\u00A0\u00A0\u00A0';
+		foldersWalk = folders => {
+			folders.forEach(oItem => {
+				if (showUnsubscribed || oItem.hasSubscriptions() || !oItem.exists) {
+					aResult.push({
+						id: oItem.fullNameRaw,
+						name:
+							sDeepPrefix.repeat(oItem.deep) +
+							fRenameCallback(oItem),
+						system: false,
+						disabled: !bNoSelectSelectable && (
+							!oItem.selectable() ||
+							aDisabled.includes(oItem.fullNameRaw) ||
+							fDisableCallback(oItem))
+					});
+				}
 
-	bBuildUnvisible = undefined === bBuildUnvisible ? false : !!bBuildUnvisible;
-	bSystem = null == bSystem ? 0 < aSystem.length : bSystem;
-	fDisableCallback = null != fDisableCallback ? fDisableCallback : null;
-	fRenameCallback = null != fRenameCallback ? fRenameCallback : null;
+				if (oItem.subFolders.length) {
+					foldersWalk(oItem.subFolders());
+				}
+			});
+		};
 
-	if (!isArray(aDisabled)) {
-		aDisabled = [];
-	}
 
-	if (!isArray(aHeaderLines)) {
-		aHeaderLines = [];
-	}
+	fDisableCallback = fDisableCallback || (() => false);
+	fRenameCallback = fRenameCallback || (oItem => oItem.name());
+	isArray(aDisabled) || (aDisabled = []);
 
-	aHeaderLines.forEach(line => {
+	isArray(aHeaderLines) && aHeaderLines.forEach(line =>
 		aResult.push({
 			id: line[0],
 			name: line[1],
 			system: false,
-			dividerbar: false,
 			disabled: false
-		});
-	});
+		})
+	);
 
-	bSep = true;
-	aSystem.forEach(oItem => {
-		aResult.push({
-			id: oItem.fullNameRaw,
-			name: fRenameCallback ? fRenameCallback(oItem) : oItem.name(),
-			system: true,
-			dividerbar: bSep,
-			disabled:
-				!oItem.selectable ||
-				aDisabled.includes(oItem.fullNameRaw) ||
-				(fDisableCallback ? fDisableCallback(oItem) : false)
-		});
-		bSep = false;
-	});
-
-	bSep = true;
-	aList.forEach(oItem => {
-		// if (oItem.subscribed() || !oItem.exists || bBuildUnvisible)
-		if (
-			(oItem.subscribed() || !oItem.exists || bBuildUnvisible) &&
-			(oItem.selectable || oItem.hasSubscribedSubfolders())
-		) {
-			if (FolderType.User === oItem.type() || !bSystem || oItem.hasSubscribedSubfolders()) {
-				aResult.push({
-					id: oItem.fullNameRaw,
-					name:
-						sDeepPrefix.repeat(oItem.deep + 1) +
-						(fRenameCallback ? fRenameCallback(oItem) : oItem.name()),
-					system: false,
-					dividerbar: bSep,
-					disabled:
-						!oItem.selectable ||
-						aDisabled.includes(oItem.fullNameRaw) ||
-						(fDisableCallback ? fDisableCallback(oItem) : false)
-				});
-				bSep = false;
-			}
-		}
-
-		if (oItem.subscribed() && oItem.subFolders.length) {
-			aResult = aResult.concat(
-				folderListOptionsBuilder(
-					[],
-					oItem.subFolders(),
-					aDisabled,
-					[],
-					fDisableCallback,
-					fRenameCallback,
-					bSystem,
-					bBuildUnvisible
-				)
-			);
-		}
-	});
+	foldersWalk(aList);
 
 	return aResult;
 }
@@ -395,13 +314,13 @@ export function computedPaginatorHelper(koCurrentPage, koPageCount) {
 			if (3 === prev) {
 				fAdd(2, false);
 			} else if (3 < prev) {
-				fAdd(Math.round((prev - 1) / 2), false, '...');
+				fAdd(Math.round((prev - 1) / 2), false, '…');
 			}
 
 			if (pageCount - 2 === next) {
 				fAdd(pageCount - 1, true);
 			} else if (pageCount - 2 > next) {
-				fAdd(Math.round((pageCount + next) / 2), true, '...');
+				fAdd(Math.round((pageCount + next) / 2), true, '…');
 			}
 
 			// first and last
@@ -434,22 +353,20 @@ export function mailToHelper(mailToUrl) {
 		mailToUrl = mailToUrl.toString().substr(7);
 
 		let to = [],
-			cc = null,
-			bcc = null,
 			params = {};
 
 		const email = mailToUrl.replace(/\?.+$/, ''),
-			query = mailToUrl.replace(/^[^?]*\?/, '');
+			query = mailToUrl.replace(/^[^?]*\?/, ''),
+			toEmailModel = value => null != value ? EmailModel.parseEmailLine(decodeURIComponent(value)) : null;
 
 		query.split('&').forEach(temp => {
 			temp = temp.split('=');
 			params[decodeURIComponent(temp[0])] = decodeURIComponent(temp[1]);
 		});
 
-		if (undefined !== params.to) {
-			to = EmailModel.parseEmailLine(decodeURIComponent(email + ',' + params.to));
+		if (null != params.to) {
 			to = Object.values(
-				to.reduce((result, value) => {
+				toEmailModel(email + ',' + params.to).reduce((result, value) => {
 					if (value) {
 						if (result[value.email]) {
 							if (!result[value.email].name) {
@@ -466,20 +383,12 @@ export function mailToHelper(mailToUrl) {
 			to = EmailModel.parseEmailLine(email);
 		}
 
-		if (undefined !== params.cc) {
-			cc = EmailModel.parseEmailLine(decodeURIComponent(params.cc));
-		}
-
-		if (undefined !== params.bcc) {
-			bcc = EmailModel.parseEmailLine(decodeURIComponent(params.bcc));
-		}
-
 		showMessageComposer([
 			ComposeType.Empty,
 			null,
 			to,
-			cc,
-			bcc,
+			toEmailModel(params.cc),
+			toEmailModel(params.bcc),
 			null == params.subject ? null : decodeURIComponent(params.subject),
 			null == params.body ? null : plainToHtml(decodeURIComponent(params.body))
 		]);

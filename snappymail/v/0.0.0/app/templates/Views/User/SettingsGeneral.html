@@ -4,64 +4,57 @@
 		<div class="control-group">
 			<label class="control-label" data-i18n="SETTINGS_GENERAL/LABEL_IDENTITY"></label>
 			<div class="controls">
-				<div style="display: inline-block; margin-top: 5px">
-					<b data-bind="click: editMainIdentity, text: identityMainDesc"
-						style="border-bottom: 1px dashed #555; cursor: pointer; padding: 2px 0px;"></b>
-				</div>
+				<b class="editMainIdentity" data-bind="click: editMainIdentity, text: identityMainDesc"></b>
 			</div>
 		</div>
 		<div class="control-group" data-bind="visible: allowLanguagesOnSettings">
 			<label class="control-label" data-i18n="SETTINGS_GENERAL/LABEL_LANGUAGE"></label>
 			<div class="controls">
-				<div class="flag-selector">
-					<span class="flag-name" tabindex="0" data-bind="text: languageFullName, click: selectLanguage, onSpace: selectLanguage, onEnter: selectLanguage"></span>
-					<span data-bind="saveTrigger: languageTrigger"></span>
-				</div>
+				<span class="select" tabindex="0" data-bind="text: languageFullName, click: selectLanguage, onSpace: selectLanguage, onEnter: selectLanguage"></span>
+				<span data-bind="saveTrigger: languageTrigger"></span>
 			</div>
 		</div>
 		<div class="control-group">
 			<label class="control-label" data-i18n="SETTINGS_GENERAL/LABEL_LAYOUT"></label>
-			<div class="controls">
-				<div data-bind="component: {
-					name: 'Select',
-					params: {
-						options: layoutTypes,
-						value: layout,
-						trigger: layoutTrigger,
-						optionsText: 'name',
-						optionsValue: 'id'
-					}
-				}"></div>
-			</div>
+			<div class="controls" data-bind="component: {
+				name: 'Select',
+				params: {
+					options: layoutTypes,
+					value: layout,
+					trigger: layoutTrigger,
+					optionsText: 'name',
+					optionsValue: 'id'
+				}
+			}"></div>
 		</div>
 		<div class="control-group">
 			<label class="control-label" data-i18n="SETTINGS_GENERAL/LABEL_EDITOR"></label>
-			<div class="controls">
-				<div data-bind="component: {
-					name: 'Select',
-					params: {
-						options: editorDefaultTypes,
-						value: editorDefaultType,
-						trigger: editorDefaultTypeTrigger,
-						optionsText: 'name',
-						optionsValue: 'id'
-					}
-				}"></div>
-			</div>
+			<div class="controls" data-bind="component: {
+				name: 'Select',
+				params: {
+					options: editorDefaultTypes,
+					value: editorDefaultType,
+					trigger: editorDefaultTypeTrigger,
+					optionsText: 'name',
+					optionsValue: 'id'
+				}
+			}"></div>
 		</div>
 		<div class="control-group">
 			<label class="control-label" data-i18n="SETTINGS_GENERAL/LABEL_MESSAGE_PER_PAGE"></label>
 			<div class="controls">
-				<div data-bind="component: {
-					name: 'Select',
-					params: {
-						options: messagesPerPageArray,
-						value: messagesPerPage,
-						trigger: mppTrigger,
-						size: 2,
-						width: 80
-					}
-				}"></div>
+				<input type="number" min="10" max="50" step="1" class="span1" data-bind="textInput: messagesPerPage"/>
+				&nbsp;
+				<span data-bind="saveTrigger: mppTrigger"></span>
+			</div>
+		</div>
+		<div class="control-group">
+			<label class="control-label" data-i18n="SETTINGS_GENERAL/LABEL_MARK_MESSAGE_READ_AFTER"></label>
+			<div class="controls">
+				<input type="number" min="0" step="1" class="span1" data-bind="textInput: messageReadDelay"/>
+				&nbsp;
+				<span data-i18n="SETTINGS_GENERAL/SECONDS"></label>
+				<span data-bind="saveTrigger: messageReadDelayTrigger"></span>
 			</div>
 		</div>
 		<div class="control-group">
@@ -114,12 +107,12 @@
 						params: {
 							label: 'SETTINGS_GENERAL/LABEL_CHROME_NOTIFICATION_DESC',
 							value: enableDesktopNotification,
-							disable: isDesktopNotificationDenied,
+							enable: isDesktopNotificationAllowed,
 							inline: true
 						}
 					}"></div>
 					&nbsp;
-					<span data-bind="visible: isDesktopNotificationDenied" style="color: #999" data-i18n="SETTINGS_GENERAL/LABEL_CHROME_NOTIFICATION_DESC_DENIED"></span>
+					<span data-bind="visible: !isDesktopNotificationAllowed()" style="color: #999" data-i18n="SETTINGS_GENERAL/LABEL_CHROME_NOTIFICATION_DESC_DENIED"></span>
 					<span class="fontastic" data-bind="click: testSystemNotification" style="color:green;cursor:pointer">▶️</span>
 				</div>
  				<div>

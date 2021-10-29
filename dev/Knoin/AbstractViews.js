@@ -6,37 +6,34 @@ import { keyScope } from 'Common/Globals';
 import { ViewType } from 'Knoin/Knoin';
 
 class AbstractView {
-	constructor(name, templateID, type)
+	constructor(templateID, type)
 	{
-		this.viewModelName = 'View/' + name;
+//		Object.defineProperty(this, 'viewModelTemplateID', { value: templateID });
 		this.viewModelTemplateID = templateID;
-		this.viewModelPosition = type;
+		this.viewType = type;
+		this.viewModelDom = null;
 
-		this.bDisabeCloseOnEsc = false;
-		this.sDefaultScope = Scope.None;
-		this.sCurrentScope = Scope.None;
-
-		this.viewModelVisible = false;
 		this.modalVisibility = ko.observable(false).extend({ rateLimit: 0 });
 
-		this.viewModelName = '';
-		this.viewModelDom = null;
+		this.keyScope = {
+			scope: Scope.None,
+			previous: Scope.None,
+			set: function() {
+				this.previous = keyScope();
+				keyScope(this.scope);
+			},
+			unset: function() {
+				keyScope(this.previous);
+			}
+		};
 	}
 
-	/**
-	 * @returns {void}
-	 */
-	storeAndSetScope() {
-		this.sCurrentScope = keyScope();
-		keyScope(this.sDefaultScope);
-	}
-
-	/**
-	 * @returns {void}
-	 */
-	restoreScope() {
-		keyScope(this.sCurrentScope);
-	}
+/*
+	onBuild() {}
+	onBeforeShow() {}
+	onShow() {}
+	onHide() {}
+*/
 
 	querySelector(selectors) {
 		return this.viewModelDom.querySelector(selectors);
@@ -60,12 +57,16 @@ export class AbstractViewPopup extends AbstractView
 {
 	constructor(name)
 	{
-		super('Popup/' + name, 'Popups' + name, ViewType.Popup);
+		super('Popups' + name, ViewType.Popup);
 		if (name in Scope) {
-			this.sDefaultScope = Scope[name];
+			this.keyScope.scope = Scope[name];
 		}
+		this.bDisabeCloseOnEsc = false;
 	}
 /*
+	onShowWithDelay() {}
+	onHideWithDelay() {}
+
 	cancelCommand() {}
 	closeCommand() {}
 */
@@ -74,7 +75,7 @@ export class AbstractViewPopup extends AbstractView
 	 */
 	registerPopupKeyDown() {
 		addEventListener('keydown', event => {
-			if (event && this.modalVisibility && this.modalVisibility()) {
+			if (event && this.modalVisibility()) {
 				if (!this.bDisabeCloseOnEsc && 'Escape' == event.key) {
 					this.cancelCommand();
 					return false;
@@ -90,24 +91,35 @@ export class AbstractViewPopup extends AbstractView
 
 export class AbstractViewCenter extends AbstractView
 {
-	constructor(name, templateID)
+	constructor(templateID)
 	{
-		super(name, templateID, ViewType.Content);
+		super(templateID, ViewType.Content);
 	}
 }
 
 export class AbstractViewLeft extends AbstractView
 {
-	constructor(name, templateID)
+	constructor(templateID)
 	{
-		super(name, templateID, ViewType.Left);
+		super(templateID, ViewType.Left);
 	}
 }
 
 export class AbstractViewRight extends AbstractView
 {
-	constructor(name, templateID)
+	constructor(templateID)
 	{
-		super(name, templateID, ViewType.Right);
+		super(templateID, ViewType.Right);
 	}
 }
+
+/*
+export class AbstractViewSettings
+{
+	onBuild(viewModelDom) {}
+	onBeforeShow() {}
+	onShow() {}
+	onHide() {}
+	viewModelDom
+}
+*/

@@ -10,24 +10,20 @@ import { FolderUserStore } from 'Stores/User/Folder';
 import { MessageUserStore } from 'Stores/User/Message';
 import { ThemeStore } from 'Stores/Theme';
 
-import { SystemDropDownMailBoxUserView } from 'View/User/MailBox/SystemDropDown';
-import { FolderListMailBoxUserView } from 'View/User/MailBox/FolderList';
-import { MessageListMailBoxUserView } from 'View/User/MailBox/MessageList';
-import { MessageViewMailBoxUserView } from 'View/User/MailBox/MessageView';
-
-import { getScreenPopupViewModel } from 'Knoin/Knoin';
+import { SystemDropDownUserView } from 'View/User/SystemDropDown';
+import { MailFolderList } from 'View/User/MailBox/FolderList';
+import { MailMessageList } from 'View/User/MailBox/MessageList';
+import { MailMessageView } from 'View/User/MailBox/MessageView';
 
 import { AbstractScreen } from 'Knoin/AbstractScreen';
-
-import { ComposePopupView } from 'View/Popup/Compose';
 
 export class MailBoxUserScreen extends AbstractScreen {
 	constructor() {
 		super('mailbox', [
-			SystemDropDownMailBoxUserView,
-			FolderListMailBoxUserView,
-			MessageListMailBoxUserView,
-			MessageViewMailBoxUserView
+			SystemDropDownUserView,
+			MailFolderList,
+			MailMessageList,
+			MailMessageView
 		]);
 	}
 
@@ -72,16 +68,13 @@ export class MailBoxUserScreen extends AbstractScreen {
 				FolderUserStore.currentFolder(folder);
 				MessageUserStore.selectMessageByFolderAndUid(folderHash, messageUid);
 			} else {
-				let threadUid = folderHash.replace(/^.+~([\d]+)$/, '$1');
-				if (folderHash === threadUid) {
-					threadUid = '';
-				}
+				let threadUid = folderHash.replace(/^.+~(\d+)$/, '$1');
 
 				FolderUserStore.currentFolder(folder);
 
 				MessageUserStore.listPage(1 > page ? 1 : page);
 				MessageUserStore.listSearch(search);
-				MessageUserStore.listThreadUid(threadUid);
+				MessageUserStore.listThreadUid((folderHash === threadUid) ? 0 : pInt(threadUid));
 
 				rl.app.reloadMessageList();
 			}
@@ -94,7 +87,6 @@ export class MailBoxUserScreen extends AbstractScreen {
 	onStart() {
 		if (!this.__started) {
 			super.onStart();
-			setTimeout(() => getScreenPopupViewModel(ComposePopupView), 500);
 
 			addEventListener('mailbox.inbox-unread-count', e => {
 				FolderUserStore.foldersInboxUnreadCount(e.detail);

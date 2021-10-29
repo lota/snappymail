@@ -45,6 +45,7 @@ button,
 input,
 optgroup,
 select,
+.select,
 textarea {
   font-family: inherit;
   font-size: @baseFontSize;
@@ -58,13 +59,13 @@ textarea {
 
 // Shared size and type resets
 select,
+.select,
 textarea,
 input {
   box-sizing: border-box;
   display: inline-block;
   height: @baseLineHeight + 10;
   padding: 4px 6px;
-  margin-bottom: 9px;
   color: @gray;
   border-radius: @inputBorderRadius;
 }
@@ -90,7 +91,6 @@ input {
 
   // Focus state
   &:focus {
-    background-color: #fff;
     border-color: darken(@inputBorder, 20%);
     box-shadow: none;
   }
@@ -112,7 +112,7 @@ input[type="checkbox"] {
 }
 
 // Make select elements obey height by applying a border
-select {
+select, .select {
   appearance: none;
   background: @inputBackground url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' height='10px' width='15px'><text x='0' y='10' fill='rgb(85,85,85)'>▾</text></svg>") right center/1em no-repeat border-box;
   border: 1px solid @inputBorder;
@@ -123,20 +123,11 @@ select {
 
 // Focus for select, file, radio, and checkbox
 select:focus,
+.select:focus,
 input[type="file"]:focus,
 input[type="radio"]:focus,
 input[type="checkbox"]:focus {
   .tab-focus();
-}
-
-
-// Placeholder
-// -------------------------
-
-// Placeholder text gets special styles; can't be bundled together though for some reason
-input::placeholder,
-textarea::placeholder {
-  color: @placeholderText;
 }
 
 
@@ -237,10 +228,6 @@ input[type="checkbox"][readonly] {
     display: inline-block;
     margin-bottom: 0;
     vertical-align: middle;
-  }
-  // Re-hide hidden elements due to specifity
-  .hide {
-    display: none;
   }
 }
 .form-inline label,

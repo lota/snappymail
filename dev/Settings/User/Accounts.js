@@ -12,7 +12,7 @@ import { showScreenPopup } from 'Knoin/Knoin';
 import { AccountPopupView } from 'View/Popup/Account';
 import { IdentityPopupView } from 'View/Popup/Identity';
 
-export class AccountsUserSettings {
+export class AccountsUserSettings /*extends AbstractViewSettings*/ {
 	constructor() {
 		this.allowAdditionalAccount = Settings.capa(Capa.AdditionalAccounts);
 		this.allowIdentities = Settings.capa(Capa.Identities);
@@ -86,10 +86,10 @@ export class AccountsUserSettings {
 
 	onBuild(oDom) {
 		oDom.addEventListener('click', event => {
-			let el = event.target.closestWithin('.accounts-list .account-item .e-action', oDom);
+			let el = event.target.closestWithin('.accounts-list .e-action', oDom);
 			el && ko.dataFor(el) && this.editAccount(ko.dataFor(el));
 
-			el = event.target.closestWithin('.identities-list .identity-item .e-action', oDom);
+			el = event.target.closestWithin('.identities-list .e-action', oDom);
 			el && ko.dataFor(el) && this.editIdentity(ko.dataFor(el));
 		});
 	}

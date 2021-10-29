@@ -4,7 +4,7 @@ import { MessagePriority } from 'Common/EnumsUser';
 import { i18n } from 'Common/Translator';
 
 import { encodeHtml } from 'Common/Html';
-import { isArray, isNonEmptyArray } from 'Common/Utils';
+import { isArray, arrayLength } from 'Common/Utils';
 
 import { serverRequestRaw } from 'Common/Links';
 
@@ -48,13 +48,12 @@ export class MessageModel extends AbstractModel {
 			spamScore: 0,
 			spamResult: '',
 			isSpam: false,
+			hasVirus: null, // or boolean when scanned
 			dateTimeStampInUTC: 0,
 			priority: MessagePriority.Normal,
 
 			senderEmailsString: '',
 			senderClearEmailsString: '',
-
-			newForAnimation: false,
 
 			deleted: false,
 			isDeleted: false,
@@ -86,6 +85,7 @@ export class MessageModel extends AbstractModel {
 		this.attachments = ko.observableArray(new AttachmentCollectionModel);
 		this.attachmentsSpecData = ko.observableArray();
 		this.threads = ko.observableArray();
+		this.unsubsribeLinks = ko.observableArray();
 
 		this.addComputables({
 			attachmentIconClass: () => FileInfo.getCombinedIconClass(this.hasAttachments() ? this.attachmentsSpecData() : []),
@@ -96,7 +96,7 @@ export class MessageModel extends AbstractModel {
 
 	_reset() {
 		this.folder = '';
-		this.uid = '';
+		this.uid = 0;
 		this.hash = '';
 		this.requestHash = '';
 		this.externalProxy = false;
@@ -107,7 +107,6 @@ export class MessageModel extends AbstractModel {
 		this.bcc = new EmailCollectionModel;
 		this.replyTo = new EmailCollectionModel;
 		this.deliveredTo = new EmailCollectionModel;
-		this.unsubsribeLinks = [];
 		this.body = null;
 		this.draftInfo = [];
 		this.messageId = '';
@@ -122,13 +121,12 @@ export class MessageModel extends AbstractModel {
 		this.spamScore(0);
 		this.spamResult('');
 		this.isSpam(false);
+		this.hasVirus(null);
 		this.dateTimeStampInUTC(0);
 		this.priority(MessagePriority.Normal);
 
 		this.senderEmailsString('');
 		this.senderClearEmailsString('');
-
-		this.newForAnimation(false);
 
 		this.deleted(false);
 		this.isDeleted(false);
@@ -156,6 +154,7 @@ export class MessageModel extends AbstractModel {
 		this.readReceipt('');
 
 		this.threads([]);
+		this.unsubsribeLinks([]);
 
 		this.hasUnseenSubMessage(false);
 		this.hasFlaggedSubMessage(false);
@@ -189,9 +188,8 @@ export class MessageModel extends AbstractModel {
 	 * @returns {boolean}
 	 */
 	revivePropertiesFromJson(json) {
-		if ('Priority' in json) {
-			let p = parseInt(json.Priority, 10);
-			json.Priority = MessagePriority.High == p || MessagePriority.Low == p ? p : MessagePriority.Normal;
+		if ('Priority' in json && ![MessagePriority.High, MessagePriority.Low].includes(json.Priority)) {
+			json.Priority = MessagePriority.Normal;
 		}
 		if (super.revivePropertiesFromJson(json)) {
 //			this.foundedCIDs = isArray(json.FoundedCIDs) ? json.FoundedCIDs : [];
@@ -205,14 +203,14 @@ export class MessageModel extends AbstractModel {
 	 * @returns {boolean}
 	 */
 	hasUnsubsribeLinks() {
-		return this.unsubsribeLinks && this.unsubsribeLinks.length;
+		return this.unsubsribeLinks().length;
 	}
 
 	/**
 	 * @returns {string}
 	 */
 	getFirstUnsubsribeLink() {
-		return this.unsubsribeLinks && this.unsubsribeLinks.length ? this.unsubsribeLinks[0] || '' : '';
+		return this.unsubsribeLinks()[0] || '';
 	}
 
 	/**
@@ -229,7 +227,7 @@ export class MessageModel extends AbstractModel {
 	 */
 	fromDkimData() {
 		let result = ['none', ''];
-		if (isNonEmptyArray(this.from) && 1 === this.from.length && this.from[0] && this.from[0].dkimStatus) {
+		if (1 === arrayLength(this.from) && this.from[0] && this.from[0].dkimStatus) {
 			result = [this.from[0].dkimStatus, this.from[0].dkimValue || ''];
 		}
 
@@ -289,7 +287,6 @@ export class MessageModel extends AbstractModel {
 			focused: this.focused(),
 			important: this.isImportant(),
 			withAttachments: this.hasAttachments(),
-			new: this.newForAnimation(),
 			emptySubject: !this.subject(),
 			// hasChildrenMessage: 1 < this.threadsLen(),
 			hasUnseenSubMessage: this.hasUnseenSubMessage(),
@@ -423,6 +420,7 @@ export class MessageModel extends AbstractModel {
 			this.spamScore(message.spamScore());
 			this.spamResult(message.spamResult());
 			this.isSpam(message.isSpam());
+			this.hasVirus(message.hasVirus());
 			this.dateTimeStampInUTC(message.dateTimeStampInUTC());
 			this.priority(message.priority());
 
@@ -436,7 +434,7 @@ export class MessageModel extends AbstractModel {
 			this.bcc = message.bcc;
 			this.replyTo = message.replyTo;
 			this.deliveredTo = message.deliveredTo;
-			this.unsubsribeLinks = message.unsubsribeLinks;
+			this.unsubsribeLinks(message.unsubsribeLinks);
 
 			this.isUnseen(message.isUnseen());
 			this.isFlagged(message.isFlagged());

@@ -20,73 +20,51 @@ class SmtpClient extends \MailSo\Net\NetClient
 	/**
 	 * @var bool
 	 */
-	private $bHelo;
+	private $bHelo = false;
 
 	/**
 	 * @var bool
 	 */
-	private $bRcpt;
+	private $bRcpt = false;
 
 	/**
 	 * @var bool
 	 */
-	private $bMail;
+	private $bMail = false;
 
 	/**
 	 * @var bool
 	 */
-	private $bData;
+	private $bData = false;
 
 	/**
 	 * @var array
 	 */
-	private $aAuthTypes;
+	private $aAuthTypes = array();
 
 	/**
 	 * @var array
 	 */
-	private $aCapa;
+	private $aCapa = array();
 
 	/**
 	 * @var int
 	 */
-	private $iSizeCapaValue;
-
-	/**
-	 * @var int
-	 */
-	private $iRequestTime;
+	private $iSizeCapaValue = 0;
 
 	/**
 	 * @var array
 	 */
-	private $aResults;
-
-	function __construct()
-	{
-		parent::__construct();
-
-		$this->aAuthTypes = array();
-
-		$this->iRequestTime = 0;
-		$this->iSizeCapaValue = 0;
-		$this->aResults = array();
-		$this->aCapa = array();
-
-		$this->bHelo = false;
-		$this->bRcpt = false;
-		$this->bMail = false;
-		$this->bData = false;
-	}
+	private $aResults = array();
 
 	public function IsSupported(string $sCapa) : bool
 	{
-		return in_array(strtoupper($sCapa), $this->aCapa);
+		return \in_array(\strtoupper($sCapa), $this->aCapa);
 	}
 
 	public function IsAuthSupported(string $sAuth) : bool
 	{
-		return in_array(strtoupper($sAuth), $this->aAuthTypes);
+		return \in_array(\strtoupper($sAuth), $this->aAuthTypes);
 	}
 
 	public function HasSupportedAuth() : bool
@@ -127,8 +105,6 @@ class SmtpClient extends \MailSo\Net\NetClient
 		bool $bVerifySsl = false, bool $bAllowSelfSigned = true,
 		string $sClientCert = '', string $sEhloHost = '[127.0.0.1]') : void
 	{
-		$this->iRequestTime = microtime(true);
-
 		parent::Connect($sServerName, $iPort, $iSecurityType, $bVerifySsl, $bAllowSelfSigned);
 
 		$this->validateResponse(220);
@@ -141,18 +117,23 @@ class SmtpClient extends \MailSo\Net\NetClient
 	 * @throws \MailSo\Net\Exceptions\Exception
 	 * @throws \MailSo\Smtp\Exceptions\Exception
 	 */
-	public function Login(string $sLogin, string $sPassword, bool $bUseAuthPlainIfSupported = true, bool $bUseAuthCramMd5IfSupported = true) : self
+	public function Login(array $aCredentials) : self
 	{
-		$sLogin = \MailSo\Base\Utils::IdnToAscii(\MailSo\Base\Utils::Trim($sLogin));
+		$sLogin = \MailSo\Base\Utils::IdnToAscii(\MailSo\Base\Utils::Trim($aCredentials['Login']));
+		$sPassword = $aCredentials['Password'];
 
-//		$encrypted = !empty(\stream_get_meta_data($this->rConnect)['crypto']);
+//		$encrypted = !empty(\stream_get_meta_data($this->ConnectionResource())['crypto']);
 		$type = '';
 		$types = [
-			'SCRAM-SHA-256' => 1, // !$encrypted
-			'SCRAM-SHA-1' => 1, // !$encrypted
-			'CRAM-MD5' => $bUseAuthCramMd5IfSupported,
-			'PLAIN' => $bUseAuthPlainIfSupported,
-			'LOGIN' => 1 // $encrypted
+			// if !$encrypted:
+			'SCRAM-SHA-256' => 1,
+			'SCRAM-SHA-1' => 1,
+			// if $encrypted:
+			'CRAM-MD5' => $aCredentials['UseAuthCramMd5IfSupported'],
+			'PLAIN' => $aCredentials['UseAuthPlainIfSupported'],
+			'OAUTHBEARER' => $aCredentials['UseAuthOAuth2IfSupported'],
+			'XOAUTH2' => $aCredentials['UseAuthOAuth2IfSupported'],
+			'LOGIN' => 1, // $encrypted
 		];
 		foreach ($types as $sasl_type => $active) {
 			if ($active && $this->IsAuthSupported($sasl_type) && \SnappyMail\SASL::isSupported($sasl_type)) {
@@ -162,7 +143,7 @@ class SmtpClient extends \MailSo\Net\NetClient
 		}
 
 		if (!$type) {
-			\trigger_error("SMTP {$this->sConnectedHost} no supported AUTH options. Disable login" . ($this->IsSupported('STARTTLS') ? ' or try with STARTTLS' : ''));
+			\trigger_error("SMTP {$this->GetConnectedHost()} no supported AUTH options. Disable login" . ($this->IsSupported('STARTTLS') ? ' or try with STARTTLS' : ''));
 			$this->writeLogException(
 				new \MailSo\Smtp\Exceptions\LoginBadMethodException,
 				\MailSo\Log\Enumerations\Type::NOTICE, true);
@@ -190,6 +171,8 @@ class SmtpClient extends \MailSo\Net\NetClient
 			{
 			// RFC 4616
 			case 'PLAIN':
+			case 'XOAUTH2':
+			case 'OAUTHBEARER':
 				$this->sendRequestWithCheck($SASL->authenticate($sLogin, $sPassword), 235, '', true);
 				break;
 
@@ -216,14 +199,6 @@ class SmtpClient extends \MailSo\Net\NetClient
 				$sResult = $this->sendRequestWithCheck($SASL->challenge($sResult), 235, '', true);
 				$SASL->verify($sResult);
 				break;
-
-/*
-			// https://developers.google.com/gmail/imap/xoauth2-protocol
-			case 'XOAUTH2':
-				throw new \Exception('Please use app passphrases: https://support.google.com/mail/answer/185833');
-				break;
-*/
-
 			}
 		}
 		catch (\MailSo\Smtp\Exceptions\NegativeResponseException $oException)
@@ -315,7 +290,7 @@ class SmtpClient extends \MailSo\Net\NetClient
 	 */
 	public function Data(string $sData) : self
 	{
-		if (!strlen(\trim($sData)))
+		if (!\strlen(\trim($sData)))
 		{
 			throw new \MailSo\Base\Exceptions\InvalidArgumentException;
 		}
@@ -433,7 +408,7 @@ class SmtpClient extends \MailSo\Net\NetClient
 	 * @throws \MailSo\Net\Exceptions\Exception
 	 * @throws \MailSo\Smtp\Exceptions\Exception
 	 */
-	public function Logout() : self
+	public function Logout() : void
 	{
 		if ($this->IsConnected())
 		{
@@ -444,8 +419,6 @@ class SmtpClient extends \MailSo\Net\NetClient
 		$this->bMail = false;
 		$this->bRcpt = false;
 		$this->bData = false;
-
-		return $this;
 	}
 
 	private function preLoginStartTLSAndEhloProcess(string $sEhloHost) : void
@@ -483,7 +456,7 @@ class SmtpClient extends \MailSo\Net\NetClient
 	 */
 	private function sendRequest(string $sCommand, string $sAddToCommand = '', bool $bSecureLog = false) : void
 	{
-		if (!strlen(\trim($sCommand)))
+		if (!\strlen(\trim($sCommand)))
 		{
 			$this->writeLogException(
 				new \MailSo\Base\Exceptions\InvalidArgumentException,
@@ -497,7 +470,6 @@ class SmtpClient extends \MailSo\Net\NetClient
 
 		$sFakeCommand = ($bSecureLog) ? '********' : '';
 
-		$this->iRequestTime = \microtime(true);
 		$this->sendRaw($sRealCommand, true, $sFakeCommand);
 	}
 
@@ -612,7 +584,7 @@ class SmtpClient extends \MailSo\Net\NetClient
 					$this->writeLogException(
 						new Exceptions\NegativeResponseException($this->aResults,
 							('' === $sErrorPrefix ? '' : $sErrorPrefix.': ').\trim(
-							(0 < \count($this->aResults) ? \implode("\r\n", $this->aResults)."\r\n" : '').
+							(\count($this->aResults) ? \implode("\r\n", $this->aResults)."\r\n" : '').
 							$this->sResponseBuffer)), \MailSo\Log\Enumerations\Type::ERROR, true);
 				}
 			}
@@ -621,19 +593,16 @@ class SmtpClient extends \MailSo\Net\NetClient
 				$this->writeLogException(
 					new Exceptions\ResponseException($this->aResults,
 						('' === $sErrorPrefix ? '' : $sErrorPrefix.': ').\trim(
-						(0 < \count($this->aResults) ? \implode("\r\n", $this->aResults)."\r\n" : '').
+						(\count($this->aResults) ? \implode("\r\n", $this->aResults)."\r\n" : '').
 						$this->sResponseBuffer)), \MailSo\Log\Enumerations\Type::ERROR, true);
 			}
 
 			$this->aResults[] = $this->sResponseBuffer;
 		}
 		while ('-' === \substr($aParts[1], 0, 1));
-
-		$this->writeLog((microtime(true) - $this->iRequestTime),
-			\MailSo\Log\Enumerations\Type::TIME);
 	}
 
-	protected function getLogName() : string
+	public function getLogName() : string
 	{
 		return 'SMTP';
 	}

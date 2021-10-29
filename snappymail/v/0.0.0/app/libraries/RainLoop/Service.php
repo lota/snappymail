@@ -53,7 +53,7 @@ class Service
 		$sServer = \trim($this->oActions->Config()->Get('security', 'custom_server_signature', ''));
 		if (0 < \strlen($sServer))
 		{
-			\header('Server: '.$sServer, true);
+			\header('Server: '.$sServer);
 		}
 
 		\header('Referrer-Policy: no-referrer');
@@ -62,22 +62,17 @@ class Service
 		// Google FLoC
 		\header('Permissions-Policy: interest-cohort=()');
 
-		$sContentSecurityPolicy = \trim($this->oActions->Config()->Get('security', 'content_security_policy', '')) ?: APP_DEFAULT_CSP;
-		if ($this->oActions->Config()->Get('security', 'use_local_proxy_for_external_images', '')) {
-			$sContentSecurityPolicy = preg_replace('/(img-src[^;]+)\\shttps:(\\s|;|$)/D', '$1$2', $sContentSecurityPolicy);
-			$sContentSecurityPolicy = preg_replace('/(img-src[^;]+)\\shttp:(\\s|;|$)/D', '$1$2', $sContentSecurityPolicy);
-		}
-		\header('Content-Security-Policy: '.$sContentSecurityPolicy, true);
+		$this->setCSP();
 
 		$sXFrameOptionsHeader = \trim($this->oActions->Config()->Get('security', 'x_frame_options_header', '')) ?: 'DENY';
-		\header('X-Frame-Options: '.$sXFrameOptionsHeader, true);
+		\header('X-Frame-Options: '.$sXFrameOptionsHeader);
 
 		$sXssProtectionOptionsHeader = \trim($this->oActions->Config()->Get('security', 'x_xss_protection_header', '')) ?: '1; mode=block';
-		\header('X-XSS-Protection: '.$sXssProtectionOptionsHeader, true);
+		\header('X-XSS-Protection: '.$sXssProtectionOptionsHeader);
 
 		if ($this->oActions->Config()->Get('labs', 'force_https', false) && !$this->oHttp->IsSecure())
 		{
-			\header('Location: https://'.$this->oHttp->GetHost(false, false).$this->oHttp->GetUrl(), true);
+			\header('Location: https://'.$this->oHttp->GetHost(false, false).$this->oHttp->GetUrl());
 			exit(0);
 		}
 
@@ -112,15 +107,26 @@ class Service
 		{
 			\MailSo\Base\Http::StatusHeader(403);
 			echo $this->oServiceActions->ErrorTemplates('Access Denied.',
-				'Access to the SnappyMail Admin Panel is not allowed!', true);
+				'Access to the SnappyMail Admin Panel is not allowed!');
 
-			return $this;
+			return false;
 		}
 
 		$bIndex = true;
 		$sResult = '';
 		if (0 < \count($aPaths) && !empty($aPaths[0]) && !$bAdmin && 'index' !== \strtolower($aPaths[0]))
 		{
+			if (!\SnappyMail\HTTP\SecFetch::isSameOrigin()) {
+				\MailSo\Base\Http::StatusHeader(403);
+				echo $this->oServiceActions->ErrorTemplates('Access Denied.',
+					"Disallowed Sec-Fetch
+					Dest: " . ($_SERVER['HTTP_SEC_FETCH_DEST'] ?? '') . "
+					Mode: " . ($_SERVER['HTTP_SEC_FETCH_MODE'] ?? '') . "
+					Site: " . ($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '') . "
+					User: " . (\SnappyMail\HTTP\SecFetch::user() ? 'true' : 'false'));
+				return false;
+			}
+
 			$bIndex = false;
 			$sMethodName = 'Service'.\preg_replace('/@.+$/', '', $aPaths[0]);
 			$sMethodExtra = 0 < \strpos($aPaths[0], '@') ? \preg_replace('/^[^@]+@/', '', $aPaths[0]) : '';
@@ -139,6 +145,7 @@ class Service
 
 		if ($bIndex)
 		{
+//			if (!\SnappyMail\HTTP\SecFetch::isEntering()) {
 			\header('Content-Type: text/html; charset=utf-8');
 			$this->oHttp->ServerNoCache();
 
@@ -146,10 +153,10 @@ class Service
 			{
 				echo $this->oServiceActions->ErrorTemplates(
 					'Permission denied!',
-					'SnappyMail cannot access to the data folder "'.APP_DATA_FOLDER_PATH.'"'
+					'SnappyMail can not access the data folder "'.APP_DATA_FOLDER_PATH.'"'
 				);
 
-				return $this;
+				return false;
 			}
 
 			$sLanguage = $this->oActions->GetLanguage($bAdmin);
@@ -168,7 +175,7 @@ class Service
 			} else {
 				$aTemplateParameters['{{BaseAppThemeCss}}'] = $this->oActions->compileCss($this->oActions->GetTheme($bAdmin), $bAdmin);
 				$aTemplateParameters['{{BaseLanguage}}'] = $this->oActions->compileLanguage($sLanguage, $bAdmin);
-				$aTemplateParameters['{{BaseTemplates}}'] = $this->oServiceActions->compileTemplates($bAdmin, false);
+				$aTemplateParameters['{{BaseTemplates}}'] = $this->oServiceActions->compileTemplates($bAdmin);
 				$sResult = \strtr(\file_get_contents(APP_VERSION_ROOT_PATH.'app/templates/Index.html'), $aTemplateParameters);
 
 				$sResult = Utils::ClearHtmlOutput($sResult);
@@ -176,6 +183,15 @@ class Service
 					$this->oActions->Cacher()->Set($sCacheFileName, $sResult);
 				}
 			}
+
+			$sScriptNonce = \SnappyMail\UUID::generate();
+			$this->setCSP($sScriptNonce);
+			$sResult = \str_replace('nonce=""', 'nonce="'.$sScriptNonce.'"', $sResult);
+/*
+			\preg_match('<script[^>]+>(.+)</script>', $sResult, $script);
+			$sScriptHash = 'sha256-'.\base64_encode(\hash('sha256', $script[1], true));
+			$this->setCSP(null, $sScriptHash);
+*/
 		}
 		else if (!\headers_sent())
 		{
@@ -189,6 +205,26 @@ class Service
 		$this->oActions->BootEnd();
 
 		return true;
+	}
+
+	private function setCSP(string $sScriptNonce = null) : void
+	{
+		$sContentSecurityPolicy = \trim($this->oActions->Config()->Get('security', 'content_security_policy', '')) ?: APP_DEFAULT_CSP;
+		if ($this->oActions->Config()->Get('security', 'use_local_proxy_for_external_images', '')) {
+			$sContentSecurityPolicy = \preg_replace('/(img-src[^;]+)\\shttps:(\\s|;|$)/D', '$1$2', $sContentSecurityPolicy);
+			$sContentSecurityPolicy = \preg_replace('/(img-src[^;]+)\\shttp:(\\s|;|$)/D', '$1$2', $sContentSecurityPolicy);
+		}
+		// Internet Explorer does not support 'nonce'
+		if (!isset($_SERVER['HTTP_USER_AGENT']) || (!\strpos($_SERVER['HTTP_USER_AGENT'], 'Trident/') && !\strpos($_SERVER['HTTP_USER_AGENT'], 'Edge/1'))) {
+			if ($sScriptNonce) {
+				$sContentSecurityPolicy = \str_replace('script-src', "script-src 'nonce-{$sScriptNonce}'", $sContentSecurityPolicy);
+			}
+			// Knockout.js requires unsafe-inline?
+			$sContentSecurityPolicy = \preg_replace("/(script-src[^;]+)'unsafe-inline'/", '$1', $sContentSecurityPolicy);
+			// Knockout.js requires eval() for observable binding purposes
+			//$sContentSecurityPolicy = \preg_replace("/(script-src[^;]+)'unsafe-eval'/", '$1', $sContentSecurityPolicy);
+		}
+		\header('Content-Security-Policy: '.$sContentSecurityPolicy);
 	}
 
 	private function staticPath(string $sPath) : string

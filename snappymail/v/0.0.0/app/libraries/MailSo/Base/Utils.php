@@ -33,126 +33,6 @@ abstract class Utils
 /x
 END;
 
-	/**
-	 * @var array
-	 */
-	public static $SuppostedCharsets = array(
-		'iso-8859-1', 'iso-8859-2', 'iso-8859-3', 'iso-8859-4', 'iso-8859-5', 'iso-8859-6',
-		'iso-8859-7', 'iso-8859-8', 'iso-8859-9', 'iso-8859-10', 'iso-8859-11', 'iso-8859-12',
-		'iso-8859-13', 'iso-8859-14', 'iso-8859-15', 'iso-8859-16',
-		'koi8-r', 'koi8-u', 'koi8-ru',
-		'cp1125', 'cp1250', 'cp1251', 'cp1252', 'cp1253', 'cp1254', 'cp1257', 'cp949', 'cp1133',
-		'cp850', 'cp866', 'cp1255', 'cp1256', 'cp862', 'cp874', 'cp932', 'cp950', 'cp1258',
-		'windows-1250', 'windows-1251', 'windows-1252', 'windows-1253', 'windows-1254', 'windows-1255',
-		'windows-1256', 'windows-1257', 'windows-1258', 'windows-874',
-		'macroman', 'maccentraleurope', 'maciceland', 'maccroatian', 'macromania', 'maccyrillic',
-		'macukraine', 'macgreek', 'macturkish', 'macintosh', 'machebrew', 'macarabic',
-		'euc-jp', 'shift_jis', 'iso-2022-jp', 'iso-2022-jp-2', 'iso-2022-jp-1',
-		'euc-cn', 'gb2312', 'hz', 'gbk', 'gb18030', 'euc-tw', 'big5', 'big5-hkscs',
-		'iso-2022-cn', 'iso-2022-cn-ext', 'euc-kr', 'iso-2022-kr', 'johab',
-		'armscii-8', 'georgian-academy', 'georgian-ps', 'koi8-t',
-		'tis-620', 'macthai', 'mulelao-1',
-		'viscii', 'tcvn', 'hp-roman8', 'nextstep',
-		'utf-8', 'ucs-2', 'ucs-2be', 'ucs-2le', 'ucs-4', 'ucs-4be', 'ucs-4le',
-		'utf-16', 'utf-16be', 'utf-16le', 'utf-32', 'utf-32be', 'utf-32le', 'utf-7',
-		'c99', 'java', 'ucs-2-internal', 'ucs-4-internal'
-	);
-
-	/**
-	 * @var array
-	 */
-	public static $aLocaleMapping = array(
-		'.65001' => 'utf-8',
-		'.20127' => 'iso-8859-1',
-
-		'.1250' => 'windows-1250',
-		'.cp1250' => 'windows-1250',
-		'.cp-1250' => 'windows-1250',
-		'.1251' => 'windows-1251',
-		'.cp1251' => 'windows-1251',
-		'.cp-1251' => 'windows-1251',
-		'.1252' => 'windows-1252',
-		'.cp1252' => 'windows-1252',
-		'.cp-1252' => 'windows-1252',
-		'.1253' => 'windows-1253',
-		'.cp1253' => 'windows-1253',
-		'.cp-1253' => 'windows-1253',
-		'.1254' => 'windows-1254',
-		'.cp1254' => 'windows-1254',
-		'.cp-1254' => 'windows-1254',
-		'.1255' => 'windows-1255',
-		'.cp1255' => 'windows-1255',
-		'.cp-1255' => 'windows-1255',
-		'.1256' => 'windows-1256',
-		'.cp1256' => 'windows-1256',
-		'.cp-1256' => 'windows-1256',
-		'.1257' => 'windows-1257',
-		'.cp1257' => 'windows-1257',
-		'.cp-1257' => 'windows-1257',
-		'.1258' => 'windows-1258',
-		'.cp1258' => 'windows-1258',
-		'.cp-1258' => 'windows-1258',
-
-		'.28591' => 'iso-8859-1',
-		'.28592' => 'iso-8859-2',
-		'.28593' => 'iso-8859-3',
-		'.28594' => 'iso-8859-4',
-		'.28595' => 'iso-8859-5',
-		'.28596' => 'iso-8859-6',
-		'.28597' => 'iso-8859-7',
-		'.28598' => 'iso-8859-8',
-		'.28599' => 'iso-8859-9',
-		'.28603' => 'iso-8859-13',
-		'.28605' => 'iso-8859-15',
-
-		'.1125' => 'cp1125',
-		'.20866' => 'koi8-r',
-		'.21866' => 'koi8-u',
-		'.950' => 'big5',
-		'.936' => 'euc-cn',
-		'.20932' => 'euc-js',
-		'.949' => 'euc-kr',
-	);
-
-	public static function DetectSystemCharset() : string
-	{
-		$sResult = '';
-		$sLocale = \setlocale(LC_ALL, '');
-		$sLocaleLower = \strtolower(\trim($sLocale));
-
-		foreach (static::$aLocaleMapping as $sKey => $sValue)
-		{
-			if (false !== \strpos($sLocaleLower, $sKey) ||
-				false !== \strpos($sLocaleLower, '.'.$sValue))
-			{
-				$sResult = $sValue;
-				break;
-			}
-		}
-
-		return $sResult;
-	}
-
-	public static function ConvertSystemString(string $sSrt) : string
-	{
-		$sSrt = \trim($sSrt);
-		if (!empty($sSrt) && !static::IsUtf8($sSrt))
-		{
-			$sCharset = static::DetectSystemCharset();
-			if (!empty($sCharset))
-			{
-				$sSrt = static::ConvertEncoding(
-					$sSrt, $sCharset, \MailSo\Base\Enumerations\Charset::UTF_8);
-			}
-			else
-			{
-				$sSrt = \utf8_encode($sSrt);
-			}
-		}
-
-		return $sSrt;
-	}
-
 	public static function NormalizeCharset(string $sEncoding, bool $bAsciAsUtf8 = false) : string
 	{
 		$sEncoding = \strtolower($sEncoding);
@@ -167,23 +47,23 @@ END;
 			case 'ascii':
 			case 'us-asci':
 			case 'us-ascii':
-				$sEncoding = $bAsciAsUtf8 ? \MailSo\Base\Enumerations\Charset::UTF_8 :
-					\MailSo\Base\Enumerations\Charset::ISO_8859_1;
+				$sEncoding = $bAsciAsUtf8 ? Enumerations\Charset::UTF_8 :
+					Enumerations\Charset::ISO_8859_1;
 				break;
 			case 'unicode-1-1-utf-7':
 			case 'unicode-1-utf-7':
 			case 'unicode-utf-7':
-				$sEncoding = \MailSo\Base\Enumerations\Charset::UTF_7;
+				$sEncoding = Enumerations\Charset::UTF_7;
 				break;
 			case 'utf8':
 			case 'utf-8':
-				$sEncoding = \MailSo\Base\Enumerations\Charset::UTF_8;
+				$sEncoding = Enumerations\Charset::UTF_8;
 				break;
 			case 'utf7imap':
 			case 'utf-7imap':
 			case 'utf7-imap':
 			case 'utf-7-imap':
-				$sEncoding = \MailSo\Base\Enumerations\Charset::UTF_7_IMAP;
+				$sEncoding = Enumerations\Charset::UTF_7_IMAP;
 				break;
 			case 'ks-c-5601-1987':
 			case 'ks_c_5601-1987':
@@ -195,7 +75,7 @@ END;
 				break;
 			case 'iso-8859-i':
 			case 'iso-8859-8-i':
-				$sEncoding = \MailSo\Base\Enumerations\Charset::ISO_8859_8;
+				$sEncoding = Enumerations\Charset::ISO_8859_8;
 				break;
 		}
 
@@ -206,12 +86,12 @@ END;
 	{
 		$sCharset = static::NormalizeCharset($sCharset);
 
-		if (\MailSo\Base\Enumerations\Charset::UTF_8 !== $sCharset &&
+		if (Enumerations\Charset::UTF_8 !== $sCharset &&
 			static::IsUtf8($sValue) &&
-			false === \strpos($sCharset, \MailSo\Base\Enumerations\Charset::ISO_2022_JP)
+			false === \strpos($sCharset, Enumerations\Charset::ISO_2022_JP)
 		)
 		{
-			$sCharset = \MailSo\Base\Enumerations\Charset::UTF_8;
+			$sCharset = Enumerations\Charset::UTF_8;
 		}
 
 		return $sCharset;
@@ -264,14 +144,28 @@ END;
 		return $sFilePath;
 	}
 
-	public static function ValidateCharsetName(string $sCharset) : bool
+	public static function MbSupportedEncoding(string $sEncoding) : bool
 	{
-		$sCharset = \strtolower(static::NormalizeCharset($sCharset));
-		return 0 < \strlen($sCharset) && (\in_array($sCharset, array(\MailSo\Base\Enumerations\Charset::UTF_7_IMAP)) ||
-			\in_array($sCharset, static::$SuppostedCharsets));
+		static $aSupportedEncodings = null;
+		if (null === $aSupportedEncodings) {
+			$aSupportedEncodings = \mb_list_encodings();
+			$aSupportedEncodings = \array_map('strtoupper', \array_unique(
+				\array_merge(
+					$aSupportedEncodings,
+					\call_user_func_array(
+						'array_merge',
+						\array_map(
+							'mb_encoding_aliases',
+							$aSupportedEncodings
+						)
+					)
+				)
+			));
+		}
+		return \in_array(\strtoupper($sEncoding), $aSupportedEncodings);
 	}
 
-	public static function MbConvertEncoding(string $sInputString, string $sInputFromEncoding, string $sInputToEncoding) : string
+	public static function MbConvertEncoding(string $sInputString, ?string $sInputFromEncoding, string $sInputToEncoding) : string
 	{
 		static $sMbstringSubCh = null;
 		if (null === $sMbstringSubCh)
@@ -279,11 +173,24 @@ END;
 			$sMbstringSubCh = \mb_substitute_character();
 		}
 
+		if ($sInputFromEncoding) {
+			$sInputFromEncoding = \strtoupper($sInputFromEncoding);
+			if (!static::MbSupportedEncoding($sInputFromEncoding)) {
+				$sInputFromEncoding = null;
+//				return $sInputString;
+/*
+				if (\function_exists('iconv')) {
+					return \iconv($sInputFromEncoding, $sInputToEncoding, $sInputString);
+				}
+*/
+			}
+		}
+
 		\mb_substitute_character('none');
-		$sResult = \mb_convert_encoding($sInputString, \strtoupper($sInputToEncoding), \strtoupper($sInputFromEncoding));
+		$sResult = \mb_convert_encoding($sInputString, \strtoupper($sInputToEncoding), $sInputFromEncoding);
 		\mb_substitute_character($sMbstringSubCh);
 
-		return $sResult;
+		return (false !== $sResult) ? $sResult : $sInputString;
 	}
 
 	public static function ConvertEncoding(string $sInputString, string $sInputFromEncoding, string $sInputToEncoding) : string
@@ -293,74 +200,44 @@ END;
 		$sFromEncoding = static::NormalizeCharset($sInputFromEncoding);
 		$sToEncoding = static::NormalizeCharset($sInputToEncoding);
 
-		if ('' === \trim($sResult) || ($sFromEncoding === $sToEncoding && \MailSo\Base\Enumerations\Charset::UTF_8 !== $sFromEncoding))
+		if ('' === \trim($sResult) || ($sFromEncoding === $sToEncoding && Enumerations\Charset::UTF_8 !== $sFromEncoding))
 		{
-			return $sResult;
+			return $sInputString;
 		}
 
-		$bUnknown = false;
-		switch (true)
-		{
-			default:
-				$bUnknown = true;
-				break;
-
-			case ($sFromEncoding === \MailSo\Base\Enumerations\Charset::ISO_8859_1 &&
-					$sToEncoding === \MailSo\Base\Enumerations\Charset::UTF_8 &&
-					\function_exists('utf8_encode')):
-
-				$sResult = \utf8_encode($sResult);
-				break;
-
-			case ($sFromEncoding === \MailSo\Base\Enumerations\Charset::UTF_8 &&
-					$sToEncoding === \MailSo\Base\Enumerations\Charset::ISO_8859_1 &&
-					\function_exists('utf8_decode')):
-
-				$sResult = \utf8_decode($sResult);
-				break;
-
-			case ($sFromEncoding === \MailSo\Base\Enumerations\Charset::UTF_7_IMAP &&
-					$sToEncoding === \MailSo\Base\Enumerations\Charset::UTF_8):
-
-				$sResult = static::Utf7ModifiedToUtf8($sResult);
-				if (false === $sResult)
-				{
-					$sResult = $sInputString;
-				}
-				break;
-
-			case ($sFromEncoding === \MailSo\Base\Enumerations\Charset::UTF_8 &&
-					$sToEncoding === \MailSo\Base\Enumerations\Charset::UTF_7_IMAP):
-
-				$sResult = static::Utf8ToUtf7Modified($sResult);
-				if (false === $sResult)
-				{
-					$sResult = $sInputString;
-				}
-				break;
-
-			case ($sFromEncoding === \MailSo\Base\Enumerations\Charset::UTF_7_IMAP):
-
-				$sResult = static::ConvertEncoding(
-					static::ModifiedToPlainUtf7($sResult),
-					\MailSo\Base\Enumerations\Charset::UTF_7,
-					$sToEncoding
-				);
-				break;
-
-			case (\in_array(\strtolower($sFromEncoding), static::$SuppostedCharsets)):
-
-				$sResult = static::MbConvertEncoding($sResult, $sFromEncoding, $sToEncoding);
-				$sResult = (false !== $sResult) ? $sResult : $sInputString;
-				break;
+		if ($sFromEncoding === Enumerations\Charset::ISO_8859_1
+		 && $sToEncoding === Enumerations\Charset::UTF_8
+		 && \function_exists('utf8_encode')) {
+			return \utf8_encode($sInputString);
 		}
 
-		if ($bUnknown)
-		{
-			$sResult = \mb_convert_encoding($sResult, $sToEncoding);
+		if ($sFromEncoding === Enumerations\Charset::UTF_8
+		 && $sToEncoding === Enumerations\Charset::ISO_8859_1
+		 && \function_exists('utf8_decode')) {
+			return \utf8_decode($sInputString);
 		}
 
-		return $sResult;
+		if ($sFromEncoding === Enumerations\Charset::UTF_7_IMAP
+		 && $sToEncoding === Enumerations\Charset::UTF_8) {
+			$sResult = static::Utf7ModifiedToUtf8($sInputString);
+			return (false !== $sResult) ? $sResult : $sInputString;
+		}
+
+		if ($sFromEncoding === Enumerations\Charset::UTF_8
+		 && $sToEncoding === Enumerations\Charset::UTF_7_IMAP) {
+			$sResult = static::Utf8ToUtf7Modified($sInputString);
+			return (false !== $sResult) ? $sResult : $sInputString;
+		}
+
+		if ($sFromEncoding === Enumerations\Charset::UTF_7_IMAP) {
+			return static::ConvertEncoding(
+				static::ModifiedToPlainUtf7($sInputString),
+				Enumerations\Charset::UTF_7,
+				$sToEncoding
+			);
+		}
+
+		return static::MbConvertEncoding($sInputString, $sFromEncoding, $sToEncoding);
 	}
 
 	public static function IsAscii(string $sValue) : bool
@@ -402,8 +279,7 @@ END;
 
 	public static function IsUtf8(string $sValue) : bool
 	{
-		return (bool) (\function_exists('mb_check_encoding') ?
-			\mb_check_encoding($sValue, 'UTF-8') : \preg_match('//u', $sValue));
+		return \mb_check_encoding($sValue, 'UTF-8');
 	}
 
 	public static function FormatFileSize(int $iSize, int $iRound = 0) : string
@@ -442,12 +318,12 @@ END;
 	public static function DecodeHeaderValue(string $sEncodedValue, string $sIncomingCharset = '', string $sForcedIncomingCharset = '') : string
 	{
 		$sValue = $sEncodedValue;
-		if (0 < \strlen($sIncomingCharset))
+		if (\strlen($sIncomingCharset))
 		{
 			$sIncomingCharset = static::NormalizeCharsetByValue($sIncomingCharset, $sValue);
 
 			$sValue = static::ConvertEncoding($sValue, $sIncomingCharset,
-				\MailSo\Base\Enumerations\Charset::UTF_8);
+				Enumerations\Charset::UTF_8);
 		}
 
 		$sValue = \preg_replace('/\?=[\n\r\t\s]{1,5}=\?/m', '?==?', $sValue);
@@ -503,9 +379,9 @@ END;
 				}
 			}
 
-			if (0 < \strlen($aTempArr[0]))
+			if (\strlen($aTempArr[0]))
 			{
-				$sCharset = 0 === \strlen($sForcedIncomingCharset) ? $aTempArr[0] : $sForcedIncomingCharset;
+				$sCharset = \strlen($sForcedIncomingCharset) ? $sForcedIncomingCharset : $aTempArr[0];
 				$sCharset = static::NormalizeCharset($sCharset, true);
 
 				if ('' === $sMainCharset)
@@ -538,15 +414,15 @@ END;
 				$aParts[$iIndex][2] = static::NormalizeCharsetByValue($aParts[$iIndex][2], $aParts[$iIndex][1]);
 
 				$sValue = \str_replace($aParts[$iIndex][0],
-					static::ConvertEncoding($aParts[$iIndex][1], $aParts[$iIndex][2], \MailSo\Base\Enumerations\Charset::UTF_8),
+					static::ConvertEncoding($aParts[$iIndex][1], $aParts[$iIndex][2], Enumerations\Charset::UTF_8),
 					$sValue);
 			}
 		}
 
-		if ($bOneCharset && 0 < \strlen($sMainCharset))
+		if ($bOneCharset && \strlen($sMainCharset))
 		{
 			$sMainCharset = static::NormalizeCharsetByValue($sMainCharset, $sValue);
-			$sValue = static::ConvertEncoding($sValue, $sMainCharset, \MailSo\Base\Enumerations\Charset::UTF_8);
+			$sValue = static::ConvertEncoding($sValue, $sMainCharset, Enumerations\Charset::UTF_8);
 		}
 
 		return $sValue;
@@ -568,7 +444,7 @@ END;
 
 			foreach ($aHeaders as $sLine)
 			{
-				if (0 < \strlen($sLine))
+				if (\strlen($sLine))
 				{
 					$sFirst = \substr($sLine,0,1);
 					if (' ' === $sFirst || "\t" === $sFirst)
@@ -607,17 +483,17 @@ END;
 	public static function EncodeUnencodedValue(string $sEncodeType, string $sValue) : string
 	{
 		$sValue = \trim($sValue);
-		if (0 < \strlen($sValue) && !static::IsAscii($sValue))
+		if (\strlen($sValue) && !static::IsAscii($sValue))
 		{
 			switch (\strtoupper($sEncodeType))
 			{
 				case 'B':
-					$sValue = '=?'.\strtolower(\MailSo\Base\Enumerations\Charset::UTF_8).
+					$sValue = '=?'.\strtolower(Enumerations\Charset::UTF_8).
 						'?B?'.\base64_encode($sValue).'?=';
 					break;
 
 				case 'Q':
-					$sValue = '=?'.\strtolower(\MailSo\Base\Enumerations\Charset::UTF_8).
+					$sValue = '=?'.\strtolower(Enumerations\Charset::UTF_8).
 						'?Q?'.\str_replace(array('?', ' ', '_'), array('=3F', '_', '=5F'),
 							\quoted_printable_encode($sValue)).'?=';
 					break;
@@ -666,7 +542,7 @@ END;
 		$sAttrName = \trim($sAttrName);
 		$sValue = \trim($sValue);
 
-		if (0 < \strlen($sValue) && !static::IsAscii($sValue))
+		if (\strlen($sValue) && !static::IsAscii($sValue))
 		{
 			$sValue = static::AttributeRfc2231Encode($sAttrName, $sValue);
 		}
@@ -681,7 +557,7 @@ END;
 	public static function GetAccountNameFromEmail(string $sEmail) : string
 	{
 		$sResult = '';
-		if (0 < \strlen($sEmail))
+		if (\strlen($sEmail))
 		{
 			$iPos = \strrpos($sEmail, '@');
 			$sResult = (false === $iPos) ? $sEmail : \substr($sEmail, 0, $iPos);
@@ -693,7 +569,7 @@ END;
 	public static function GetDomainFromEmail(string $sEmail) : string
 	{
 		$sResult = '';
-		if (0 < \strlen($sEmail))
+		if (\strlen($sEmail))
 		{
 			$iPos = \strrpos($sEmail, '@');
 			if (false !== $iPos && 0 < $iPos)
@@ -885,7 +761,7 @@ END;
 		);
 
 		$sExt = static::GetFileExtension($sFileName);
-		if (0 < \strlen($sExt) && isset($aMimeTypes[$sExt]))
+		if (\strlen($sExt) && isset($aMimeTypes[$sExt]))
 		{
 			$sResult = $aMimeTypes[$sExt];
 		}
@@ -895,59 +771,53 @@ END;
 
 	public static function ContentTypeType(string $sContentType, string $sFileName) : string
 	{
-		$sResult = '';
 		$sContentType = \strtolower($sContentType);
-		if (0 === \strpos($sContentType, 'image/'))
-		{
-			$sResult = 'image';
-		}
-		else
-		{
-			switch ($sContentType)
-			{
-				case 'application/zip':
-				case 'application/x-7z-compressed':
-				case 'application/x-rar-compressed':
-				case 'application/x-msdownload':
-				case 'application/vnd.ms-cab-compressed':
-				case 'application/x-gzip':
-				case 'application/x-bzip':
-				case 'application/x-bzip2':
-				case 'application/x-debian-package':
-					$sResult = 'archive';
-					break;
-				case 'application/msword':
-				case 'application/rtf':
-				case 'application/vnd.ms-excel':
-				case 'application/vnd.ms-powerpoint':
-				case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-				case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
-				case 'application/vnd.openxmlformats-officedocument.wordprocessingml.template':
-				case 'application/vnd.openxmlformats-officedocument.presentationml.presentation':
-				case 'application/vnd.oasis.opendocument.text':
-				case 'application/vnd.oasis.opendocument.spreadsheet':
-					$sResult = 'doc';
-					break;
-				case 'application/pdf':
-				case 'application/x-pdf':
-					$sResult = 'pdf';
-					break;
-			}
-
-			if ('' === $sResult)
-			{
-				switch (\strtolower(static::GetFileExtension($sFileName)))
-				{
-					case 'zip':
-					case '7z':
-					case 'rar':
-						$sResult = 'archive';
-						break;
-				}
-			}
+		if (0 === \strpos($sContentType, 'image/')) {
+			return 'image';
 		}
 
-		return $sResult;
+		switch ($sContentType)
+		{
+			case 'application/zip':
+			case 'application/x-7z-compressed':
+			case 'application/x-rar-compressed':
+			case 'application/x-msdownload':
+			case 'application/vnd.ms-cab-compressed':
+			case 'application/x-gzip':
+			case 'application/x-bzip':
+			case 'application/x-bzip2':
+			case 'application/x-debian-package':
+				return 'archive';
+
+			case 'application/msword':
+			case 'application/rtf':
+			case 'application/vnd.ms-excel':
+			case 'application/vnd.ms-powerpoint':
+			case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+			case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+			case 'application/vnd.openxmlformats-officedocument.wordprocessingml.template':
+			case 'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+			case 'application/vnd.oasis.opendocument.text':
+			case 'application/vnd.oasis.opendocument.spreadsheet':
+				return 'doc';
+
+			case 'application/pdf':
+			case 'application/x-pdf':
+				return 'pdf';
+		}
+
+		switch (\strtolower(static::GetFileExtension($sFileName)))
+		{
+			case 'zip':
+			case '7z':
+			case 'rar':
+				return 'archive';
+
+			case 'pdf':
+				return 'pdf';
+		}
+
+		return '';
 	}
 
 	/**
@@ -956,7 +826,7 @@ END;
 	public static function ResetTimeLimit(int $iTimeToReset = 15, int $iTimeToAdd = 120) : bool
 	{
 		$iTime = \time();
-		if ($iTime < \MailSo\Base\Loader::$InitTime + 5)
+		if ($iTime < $_SERVER['REQUEST_TIME_FLOAT'] + 5)
 		{
 			// do nothing first 5s
 			return true;
@@ -1302,7 +1172,7 @@ END;
 	{
 		$aResult = array();
 		$sSequence = \trim($sSequence);
-		if (0 < \strlen($sSequence))
+		if (\strlen($sSequence))
 		{
 			$aSequence = \explode(',', $sSequence);
 			foreach ($aSequence as $sItem)
@@ -1788,19 +1658,12 @@ END;
 			$mResult = \mb_detect_encoding($sStr, 'auto', true);
 		}
 
-		return \is_string($mResult) && 0 < \strlen($mResult) ? $mResult : '';
+		return \is_string($mResult) && \strlen($mResult) ? $mResult : '';
 	}
 
-    public static function Md5Rand(string $sAdditionalSalt = '') : string
-    {
-		return \md5(\microtime(true).\rand(10000, 99999).
-			\md5($sAdditionalSalt).\rand(10000, 99999).\microtime(true));
-	}
-
-    public static function Sha1Rand(string $sAdditionalSalt = '') : string
-    {
-		return \sha1(\microtime(true).\rand(10000, 99999).
-			\sha1($sAdditionalSalt).\rand(10000, 99999).\microtime(true));
+	public static function Sha1Rand(string $sAdditionalSalt = '') : string
+	{
+		return \sha1($sAdditionalSalt . \random_bytes(16));
 	}
 
 	public static function ValidateDomain(string $sDomain, bool $bSimple = false) : bool
@@ -1824,7 +1687,7 @@ END;
 
 	public static function IdnToUtf8(string $sStr, bool $bLowerIfAscii = false) : string
 	{
-		if (0 < \strlen($sStr) && \preg_match('/(^|\.|@)xn--/i', $sStr))
+		if (\strlen($sStr) && \preg_match('/(^|\.|@)xn--/i', $sStr))
 		{
 			try
 			{
@@ -1848,7 +1711,7 @@ END;
 			$sDomain = static::GetDomainFromEmail($sStr);
 		}
 
-		if (0 < \strlen($sDomain) && \preg_match('/[^\x20-\x7E]/', $sDomain))
+		if (\strlen($sDomain) && \preg_match('/[^\x20-\x7E]/', $sDomain))
 		{
 			try
 			{
@@ -1858,23 +1721,5 @@ END;
 		}
 
 		return ('' === $sUser ? '' : $sUser.'@').$sDomain;
-	}
-
-	public static function HashToId(string $sHash, string $sSalt = '') : int
-	{
-		$sData = $sHash ? @\MailSo\Base\Crypt::Decrypt(\hex2bin($sHash), \md5($sSalt)) : null;
-
-		$aMatch = array();
-		if ($sData && preg_match('/^id:(\d+)$/', $sData, $aMatch) && isset($aMatch[1]))
-		{
-			return is_numeric($aMatch[1]) ? (int) $aMatch[1] : null;
-		}
-
-		return null;
-	}
-
-	public static function IdToHash(int $iID, string $sSalt = '') : string
-	{
-		return \bin2hex(\MailSo\Base\Crypt::Encrypt('id:'.$iID, \md5($sSalt)));
 	}
 }

@@ -30,12 +30,22 @@ class FolderCollection extends \MailSo\Base\Collection
 	/**
 	 * @var bool
 	 */
+	public $IsMetadataSupported = false;
+
+	/**
+	 * @var bool
+	 */
 	public $IsThreadsSupported = false;
 
 	/**
 	 * @var bool
 	 */
 	public $IsSortSupported = false;
+
+	/**
+	 * @var bool
+	 */
+	public $IsListStatusSupported = false;
 
 	/**
 	 * @var bool
@@ -130,35 +140,18 @@ class FolderCollection extends \MailSo\Base\Collection
 		$this->append($oMailFolder);
 	}
 
-	public function SortByCallback(callable $fCallback) : void
-	{
-		if (\is_callable($fCallback))
-		{
-			$aList = $this->getArrayCopy();
-
-			\usort($aList, $fCallback);
-
-			foreach ($aList as $oItemFolder)
-			{
-				if ($oItemFolder->HasSubFolders())
-				{
-					$oItemFolder->SubFolders()->SortByCallback($fCallback);
-				}
-			}
-		}
-	}
-
 	public function jsonSerialize()
 	{
 		return \array_merge(parent::jsonSerialize(), array(
 			'Namespace' => $this->GetNamespace(),
 			'FoldersHash' => $this->FoldersHash ?: '',
+			'IsMetadataSupported' => $this->IsMetadataSupported,
 			'IsThreadsSupported' => $this->IsThreadsSupported,
 			'IsSortSupported' => $this->IsSortSupported,
+			'IsListStatusSupported' => $this->IsListStatusSupported,
 			'Optimized' => $this->Optimized,
 			'CountRec' => $this->CountRec(),
-			'SystemFolders' => isset($this->SystemFolders) && \is_array($this->SystemFolders) ?
-				$this->SystemFolders : array()
+			'SystemFolders' => empty($this->SystemFolders) ? null : $this->SystemFolders
 		));
 	}
 }

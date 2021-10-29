@@ -6,11 +6,11 @@ class ChangePasswordPlugin extends \RainLoop\Plugins\AbstractPlugin
 {
 	const
 		NAME     = 'Change Password',
-		VERSION  = '2.2',
+		VERSION  = '2.3',
 		RELEASE  = '2021-07-20',
 		REQUIRED = '2.5.0',
 		CATEGORY = 'Security',
-		DESCRIPTION = 'This plugin allows you to change passwords of email accounts';
+		DESCRIPTION = 'Extension to allow users to change their passwords';
 
 	// \RainLoop\Notifications\
 	const
@@ -23,7 +23,7 @@ class ChangePasswordPlugin extends \RainLoop\Plugins\AbstractPlugin
 	{
 		$this->UseLangs(true); // start use langs folder
 
-		$this->addCss('style.less');
+//		$this->addCss('style.css');
 		$this->addJs('js/ChangePasswordUserSettings.js'); // add js file
 		$this->addJsonHook('ChangePassword', 'ChangePassword');
 		$this->addTemplate('templates/SettingsChangePassword.html');
@@ -99,7 +99,8 @@ class ChangePasswordPlugin extends \RainLoop\Plugins\AbstractPlugin
 			$result[] = \RainLoop\Plugins\Property::NewInstance("driver_{$name}_enabled")
 				->SetLabel('Enable ' . $class::NAME)
 				->SetType(\RainLoop\Enumerations\PluginPropertyType::BOOL)
-				->SetDescription($class::DESCRIPTION);
+				->SetDescription($class::DESCRIPTION)
+				->SetDefaultValue(false);
 			$result[] = \RainLoop\Plugins\Property::NewInstance("driver_{$name}_allowed_emails")
 				->SetLabel('Allowed emails')
 				->SetType(\RainLoop\Enumerations\PluginPropertyType::STRING_TEXT)

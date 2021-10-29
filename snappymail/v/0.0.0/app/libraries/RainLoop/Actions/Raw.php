@@ -15,10 +15,10 @@ trait Raw
 		$aValues = $this->getDecodedRawKeyValue($sRawKey);
 
 		$sFolder = isset($aValues['Folder']) ? $aValues['Folder'] : '';
-		$iUid = (int) (isset($aValues['Uid']) ? $aValues['Uid'] : 0);
+		$iUid = (isset($aValues['Uid']) ? (int) $aValues['Uid'] : 0);
 		$sMimeIndex = (string) (isset($aValues['MimeIndex']) ? $aValues['MimeIndex'] : '');
 
-		\header('Content-Type: text/plain', true);
+		\header('Content-Type: text/plain');
 
 		return $this->MailClient()->MessageMimeStream(function ($rResource) {
 			if (\is_resource($rResource))
@@ -112,36 +112,6 @@ trait Raw
 		return false;
 	}
 
-	public function RawContactsVcf() : bool
-	{
-		$oAccount = $this->getAccountFromToken();
-
-		\header('Content-Type: text/x-vcard; charset=UTF-8');
-		\header('Content-Disposition: attachment; filename="contacts.vcf"', true);
-		\header('Accept-Ranges: none', true);
-		\header('Content-Transfer-Encoding: binary');
-
-		$this->oHttp->ServerNoCache();
-
-		return $this->AddressBookProvider($oAccount)->IsActive() ?
-			$this->AddressBookProvider($oAccount)->Export($oAccount->ParentEmailHelper(), 'vcf') : false;
-	}
-
-	public function RawContactsCsv() : bool
-	{
-		$oAccount = $this->getAccountFromToken();
-
-		\header('Content-Type: text/csv; charset=UTF-8');
-		\header('Content-Disposition: attachment; filename="contacts.csv"', true);
-		\header('Accept-Ranges: none', true);
-		\header('Content-Transfer-Encoding: binary');
-
-		$this->oHttp->ServerNoCache();
-
-		return $this->AddressBookProvider($oAccount)->IsActive() ?
-			$this->AddressBookProvider($oAccount)->Export($oAccount->ParentEmailHelper(), 'csv') : false;
-	}
-
 	private function rawSmart(bool $bDownload, bool $bThumbnail = false) : bool
 	{
 		$sRawKey = (string) $this->GetActionParam('RawKey', '');
@@ -177,8 +147,12 @@ trait Raw
 
 			$oAccount = $this->getAccountFromToken();
 
-			$sContentTypeOut = empty($sContentTypeIn) ?
-				\MailSo\Base\Utils::MimeContentType($sFileNameIn) : $sContentTypeIn;
+			// https://github.com/the-djmaze/snappymail/issues/144
+			if ('.pdf' === \substr($sFileNameIn,-4)) {
+				$sContentTypeOut = 'application/pdf'; // application/octet-stream
+			} else {
+				$sContentTypeOut = $sContentTypeIn ?: \MailSo\Base\Utils::MimeContentType($sFileNameIn);
+			}
 
 			$sFileNameOut = $this->MainClearFileName($sFileNameIn, $sContentTypeIn, $sMimeIndex);
 
@@ -187,9 +161,9 @@ trait Raw
 			{
 				\header('Content-Type: '.$sContentTypeOut);
 				\header('Content-Disposition: attachment; '.
-					\trim(\MailSo\Base\Utils::EncodeHeaderUtf8AttributeValue('filename', $sFileNameOut)), true);
+					\trim(\MailSo\Base\Utils::EncodeHeaderUtf8AttributeValue('filename', $sFileNameOut)));
 
-				\header('Accept-Ranges: none', true);
+				\header('Accept-Ranges: none');
 				\header('Content-Transfer-Encoding: binary');
 
 				\MailSo\Base\Utils::FpassthruWithTimeLimitReset($rResource);
@@ -234,6 +208,11 @@ trait Raw
 						$sFileNameOut = $sFileName;
 					}
 
+					// https://github.com/the-djmaze/snappymail/issues/144
+					if ('.pdf' === \substr($sFileNameOut,-4)) {
+						$sContentTypeOut = 'application/pdf';
+					}
+
 					$sFileNameOut = $self->MainClearFileName($sFileNameOut, $sContentTypeOut, $sMimeIndex);
 
 					$self->cacheByKey($sRawKey);
@@ -247,7 +226,7 @@ trait Raw
 							{
 								$oImage = static::loadImage(\stream_get_contents($rResource), $bDetectImageOrientation, 60);
 								\header('Content-Disposition: inline; '.
-									\trim(\MailSo\Base\Utils::EncodeHeaderUtf8AttributeValue('filename', $sFileNameOut.'_thumb60x60.png')), true);
+									\trim(\MailSo\Base\Utils::EncodeHeaderUtf8AttributeValue('filename', $sFileNameOut.'_thumb60x60.png')));
 								$oImage->show('png');
 //								$oImage->show('webp'); // Little Britain: "Safari says NO"
 								exit;
@@ -265,7 +244,7 @@ trait Raw
 								$sLoadedData = \stream_get_contents($rResource);
 								$oImage = static::loadImage($sLoadedData, $bDetectImageOrientation);
 								\header('Content-Disposition: inline; '.
-									\trim(\MailSo\Base\Utils::EncodeHeaderUtf8AttributeValue('filename', $sFileNameOut)), true);
+									\trim(\MailSo\Base\Utils::EncodeHeaderUtf8AttributeValue('filename', $sFileNameOut)));
 								$oImage->show();
 							}
 							catch (\Throwable $oException)
@@ -284,7 +263,7 @@ trait Raw
 						if (!headers_sent()) {
 							\header('Content-Type: '.$sContentTypeOut);
 							\header('Content-Disposition: '.($bDownload ? 'attachment' : 'inline').'; '.
-							\trim(\MailSo\Base\Utils::EncodeHeaderUtf8AttributeValue('filename', $sFileNameOut)), true);
+								\trim(\MailSo\Base\Utils::EncodeHeaderUtf8AttributeValue('filename', $sFileNameOut)));
 
 							\header('Accept-Ranges: bytes');
 							\header('Content-Transfer-Encoding: binary');
@@ -328,7 +307,7 @@ trait Raw
 
 								if (0 < $iContentLength)
 								{
-									\header('Content-Length: '.$iContentLength, true);
+									\header('Content-Length: '.$iContentLength);
 									\header('Content-Range: bytes '.$sRangeStart.'-'.(0 < $iRangeEnd ? $iRangeEnd : $iFullContentLength - 1).'/'.$iFullContentLength);
 								}
 

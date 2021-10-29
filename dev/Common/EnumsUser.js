@@ -4,14 +4,28 @@
  * @enum {number}
  */
 export const FolderType = {
-	Inbox: 10,
-	SentItems: 11,
-	Draft: 12,
-	Trash: 13,
-	Spam: 14,
-	Archive: 15,
-	NotSpam: 80,
-	User: 99
+	User: 0,
+	Inbox: 1,
+	Sent: 2,
+	Drafts: 3,
+	Spam: 4, // JUNK
+	Trash: 5,
+	Archive: 6,
+	NotSpam: 80
+};
+
+/**
+ * @enum {string}
+ */
+export const FolderMetadataKeys = {
+	// RFC 5464
+	Comment: '/private/comment',
+	CommentShared: '/shared/comment',
+	// RFC 6154
+	SpecialUse: '/private/specialuse',
+	// Kolab
+	KolabFolderType: '/private/vendor/kolab/folder-type',
+	KolabFolderTypeShared: '/shared/vendor/kolab/folder-type'
 };
 
 /**

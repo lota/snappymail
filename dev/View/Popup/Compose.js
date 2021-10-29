@@ -12,7 +12,7 @@ import {
 	SetSystemFoldersNotification
 } from 'Common/EnumsUser';
 
-import { inFocus, pInt, isArray, isNonEmptyArray } from 'Common/Utils';
+import { inFocus, pInt, isArray, arrayLength } from 'Common/Utils';
 import { delegateRunOnDestroy } from 'Common/UtilsUser';
 import { encodeHtml, HtmlEditor } from 'Common/Html';
 
@@ -21,7 +21,7 @@ import { serverRequest } from 'Common/Links';
 import { i18n, getNotification, getUploadErrorDescByCode } from 'Common/Translator';
 import { timestampToString } from 'Common/Momentor';
 import { MessageFlagsCache, setFolderHash } from 'Common/Cache';
-import { doc, Settings, SettingsGet } from 'Common/Globals';
+import { doc, Settings, SettingsGet, getFullscreenElement, exitFullscreen } from 'Common/Globals';
 
 import { AppUserStore } from 'Stores/User/App';
 import { SettingsUserStore } from 'Stores/User/Settings';
@@ -130,7 +130,6 @@ class ComposePopupView extends AbstractViewPopup {
 		this.allowContacts = AppUserStore.allowContacts();
 
 		this.bSkipNextHide = false;
-		this.editorDefaultType = SettingsUserStore.editorDefaultType;
 
 		this.capaOpenPGP = PgpUserStore.capaOpenPGP;
 
@@ -171,7 +170,7 @@ class ComposePopupView extends AbstractViewPopup {
 			showReplyTo: false,
 
 			draftFolder: '',
-			draftUid: '',
+			draftUid: 0,
 			sending: false,
 			saving: false,
 
@@ -179,7 +178,6 @@ class ComposePopupView extends AbstractViewPopup {
 
 			composeUploaderButton: null,
 			composeUploaderDropPlace: null,
-			dragAndDropEnabled: false,
 			attacheMultipleAllowed: false,
 			addAttachmentEnabled: false,
 
@@ -308,7 +306,7 @@ class ComposePopupView extends AbstractViewPopup {
 			},
 
 			attachmentsInProcess: value => {
-				if (this.attachmentsInProcessError() && isNonEmptyArray(value)) {
+				if (this.attachmentsInProcessError() && arrayLength(value)) {
 					this.attachmentsInProcessError(false);
 				}
 			}
@@ -385,8 +383,7 @@ class ComposePopupView extends AbstractViewPopup {
 		if (!this.emptyToError() && !this.attachmentsInErrorError() && !this.attachmentsInProcessError()) {
 			if (SettingsUserStore.replySameFolder()) {
 				if (
-					isArray(this.aDraftInfo) &&
-					3 === this.aDraftInfo.length &&
+					3 === arrayLength(this.aDraftInfo) &&
 					null != this.aDraftInfo[2] &&
 					this.aDraftInfo[2].length
 				) {
@@ -400,7 +397,7 @@ class ComposePopupView extends AbstractViewPopup {
 				this.sendError(false);
 				this.sending(true);
 
-				if (isArray(this.aDraftInfo) && 3 === this.aDraftInfo.length) {
+				if (3 === arrayLength(this.aDraftInfo)) {
 					const flagsCache = MessageFlagsCache.getFor(this.aDraftInfo[2], this.aDraftInfo[1]);
 					if (flagsCache) {
 						if ('forward' === this.aDraftInfo[0]) {
@@ -468,7 +465,7 @@ class ComposePopupView extends AbstractViewPopup {
 
 							if (this.bFromDraft) {
 								const message = MessageUserStore.message();
-								if (message && this.draftFolder() === message.folder && this.draftUid() === message.uid) {
+								if (message && this.draftFolder() === message.folder && this.draftUid() == message.uid) {
 									MessageUserStore.message(null);
 								}
 							}
@@ -646,7 +643,7 @@ class ComposePopupView extends AbstractViewPopup {
 
 		this.resizeObserver.disconnect();
 
-		(doc.fullscreenElement || doc.webkitFullscreenElement) === this.oContent && doc.exitFullscreen();
+		(getFullscreenElement() === this.oContent) && exitFullscreen();
 	}
 
 	editor(fOnInit) {
@@ -718,6 +715,8 @@ class ComposePopupView extends AbstractViewPopup {
 
 		this.autosaveStart();
 
+		this.viewModelDom.dataset.wysiwyg = SettingsUserStore.editorDefaultType();
+
 		if (AppUserStore.composeInEdit()) {
 			type = type || ComposeType.Empty;
 			if (ComposeType.Empty !== type) {
@@ -753,7 +752,7 @@ class ComposePopupView extends AbstractViewPopup {
 	 * @param {Array} emails
 	 */
 	addEmailsTo(fKoValue, emails) {
-		if (isNonEmptyArray(emails)) {
+		if (arrayLength(emails)) {
 			const value = fKoValue().trim(),
 				values = emails.map(item => item ? item.toLine(false) : null)
 					.validUnique();
@@ -774,7 +773,7 @@ class ComposePopupView extends AbstractViewPopup {
 	}
 
 	isPlainEditor() {
-		let type = this.editorDefaultType();
+		let type = SettingsUserStore.editorDefaultType();
 		return EditorDefaultType.Html !== type && EditorDefaultType.HtmlForced !== type;
 	}
 
@@ -806,11 +805,11 @@ class ComposePopupView extends AbstractViewPopup {
 		oMessageOrArray = oMessageOrArray || null;
 		if (oMessageOrArray) {
 			message =
-				isArray(oMessageOrArray) && 1 === oMessageOrArray.length
+				1 === arrayLength(oMessageOrArray)
 					? oMessageOrArray[0]
-					: !isArray(oMessageOrArray)
-					? oMessageOrArray
-					: null;
+					: isArray(oMessageOrArray)
+					? null
+					: oMessageOrArray;
 		}
 
 		this.oLastMessage = message;
@@ -826,15 +825,15 @@ class ComposePopupView extends AbstractViewPopup {
 			excludeEmail[identity.email()] = true;
 		}
 
-		if (isNonEmptyArray(aToEmails)) {
+		if (arrayLength(aToEmails)) {
 			this.to(this.emailArrayToStringLineHelper(aToEmails));
 		}
 
-		if (isNonEmptyArray(aCcEmails)) {
+		if (arrayLength(aCcEmails)) {
 			this.cc(this.emailArrayToStringLineHelper(aCcEmails));
 		}
 
-		if (isNonEmptyArray(aBccEmails)) {
+		if (arrayLength(aBccEmails)) {
 			this.bcc(this.emailArrayToStringLineHelper(aBccEmails));
 		}
 
@@ -899,7 +898,7 @@ class ComposePopupView extends AbstractViewPopup {
 					this.subject(sSubject);
 					this.prepareMessageAttachments(message, lineComposeType);
 
-					this.aDraftInfo = isNonEmptyArray(aDraftInfo) && 3 === aDraftInfo.length ? aDraftInfo : null;
+					this.aDraftInfo = 3 === arrayLength(aDraftInfo) ? aDraftInfo : null;
 					this.sInReplyTo = message.sInReplyTo;
 					this.sReferences = message.sReferences;
 					break;
@@ -913,7 +912,7 @@ class ComposePopupView extends AbstractViewPopup {
 					this.subject(sSubject);
 					this.prepareMessageAttachments(message, lineComposeType);
 
-					this.aDraftInfo = isNonEmptyArray(aDraftInfo) && 3 === aDraftInfo.length ? aDraftInfo : null;
+					this.aDraftInfo = 3 === arrayLength(aDraftInfo) ? aDraftInfo : null;
 					this.sInReplyTo = message.sInReplyTo;
 					this.sReferences = message.sReferences;
 					break;
@@ -973,8 +972,8 @@ class ComposePopupView extends AbstractViewPopup {
 				editor.setHtml(sText);
 
 				if (
-					EditorDefaultType.PlainForced === this.editorDefaultType() ||
-					(!message.isHtml() && EditorDefaultType.HtmlForced !== this.editorDefaultType())
+					EditorDefaultType.PlainForced === SettingsUserStore.editorDefaultType() ||
+					(!message.isHtml() && EditorDefaultType.HtmlForced !== SettingsUserStore.editorDefaultType())
 				) {
 					editor.modePlain();
 				}
@@ -1003,7 +1002,7 @@ class ComposePopupView extends AbstractViewPopup {
 
 				this.setFocusInPopup();
 			});
-		} else if (isNonEmptyArray(oMessageOrArray)) {
+		} else if (arrayLength(oMessageOrArray)) {
 			oMessageOrArray.forEach(item => this.addMessageAsAttachment(item));
 
 			this.editor(editor => {
@@ -1024,7 +1023,7 @@ class ComposePopupView extends AbstractViewPopup {
 		}
 
 		const downloads = this.getAttachmentsDownloadsForUpload();
-		if (isNonEmptyArray(downloads)) {
+		if (arrayLength(downloads)) {
 			Remote.messageUploadAttachments((iError, oData) => {
 				if (!iError) {
 					Object.entries(oData.Result).forEach(([tempName, id]) => {
@@ -1087,17 +1086,134 @@ class ComposePopupView extends AbstractViewPopup {
 			this.identitiesDropdownTrigger(true);
 			return false;
 		}
-		return true;
 	}
 
 	onBuild(dom) {
-		this.initUploader();
+		// initUploader
+
+		if (this.composeUploaderButton()) {
+			const uploadCache = {},
+				attachmentSizeLimit = pInt(SettingsGet('AttachmentLimit')),
+				oJua = new Jua({
+					action: serverRequest('Upload'),
+					clickElement: this.composeUploaderButton(),
+					dragAndDropElement: this.composeUploaderDropPlace()
+				});
+
+			oJua
+				// .on('onLimitReached', (limit) => {
+				// 	alert(limit);
+				// })
+				.on('onDragEnter', () => {
+					this.dragAndDropOver(true);
+				})
+				.on('onDragLeave', () => {
+					this.dragAndDropOver(false);
+				})
+				.on('onBodyDragEnter', () => {
+					this.attachmentsPlace(true);
+					this.dragAndDropVisible(true);
+				})
+				.on('onBodyDragLeave', () => {
+					this.dragAndDropVisible(false);
+				})
+				.on('onProgress', (id, loaded, total) => {
+					let item = uploadCache[id];
+					if (!item) {
+						item = this.getAttachmentById(id);
+						if (item) {
+							uploadCache[id] = item;
+						}
+					}
+
+					if (item) {
+						item.progress(Math.floor((loaded / total) * 100));
+					}
+				})
+				.on('onSelect', (sId, oData) => {
+					this.dragAndDropOver(false);
+
+					const fileName = undefined === oData.FileName ? '' : oData.FileName.toString(),
+						size = pInt(oData.Size, null),
+						attachment = new ComposeAttachmentModel(sId, fileName, size);
+
+					attachment.cancel = this.cancelAttachmentHelper(sId, oJua);
+
+					this.attachments.push(attachment);
+
+					this.attachmentsPlace(true);
+
+					if (0 < size && 0 < attachmentSizeLimit && attachmentSizeLimit < size) {
+						attachment
+							.waiting(false)
+							.uploading(true)
+							.complete(true)
+							.error(i18n('UPLOAD/ERROR_FILE_IS_TOO_BIG'));
+
+						return false;
+					}
+
+					return true;
+				})
+				.on('onStart', (id) => {
+					let item = uploadCache[id];
+					if (!item) {
+						item = this.getAttachmentById(id);
+						if (item) {
+							uploadCache[id] = item;
+						}
+					}
+
+					if (item) {
+						item
+							.waiting(false)
+							.uploading(true)
+							.complete(false);
+					}
+				})
+				.on('onComplete', (id, result, data) => {
+					const attachment = this.getAttachmentById(id),
+						response = (data && data.Result) || {},
+						errorCode = response.ErrorCode,
+						attachmentJson = result && response.Attachment;
+
+					let error = '';
+					if (null != errorCode) {
+						error = getUploadErrorDescByCode(errorCode);
+					} else if (!attachmentJson) {
+						error = i18n('UPLOAD/ERROR_UNKNOWN');
+					}
+
+					if (attachment) {
+						if (error) {
+							attachment
+								.waiting(false)
+								.uploading(false)
+								.complete(true)
+								.error(error + '\n' + response.ErrorMessage);
+						} else if (attachmentJson) {
+							attachment
+								.waiting(false)
+								.uploading(false)
+								.complete(true);
+
+							attachment.initByUploadJson(attachmentJson);
+						}
+
+						if (undefined === uploadCache[id]) {
+							delete uploadCache[id];
+						}
+					}
+				});
+
+			this.addAttachmentEnabled(true);
+		}
 
 		shortcuts.add('q', 'meta', Scope.Compose, ()=>false);
 		shortcuts.add('w', 'meta', Scope.Compose, ()=>false);
 
-		shortcuts.add('m,contextmenu', '', Scope.Compose, e => this.popupMenu(e));
-		shortcuts.add('m', 'ctrl', Scope.Compose, e => this.popupMenu(e));
+		shortcuts.add('contextmenu', '', Scope.Compose, e => this.popupMenu(e));
+		shortcuts.add('m', 'meta', Scope.Compose, e => this.popupMenu(e));
 
 		shortcuts.add('escape,close', '', Scope.Compose, () => {
 			this.skipCommand();
@@ -1112,7 +1228,7 @@ class ComposePopupView extends AbstractViewPopup {
 			this.saveCommand();
 			return false;
 		});
-		shortcuts.add('save', Scope.Compose, () => {
+		shortcuts.add('save', '', Scope.Compose, () => {
 			this.saveCommand();
 			return false;
 		});
@@ -1139,7 +1255,7 @@ class ComposePopupView extends AbstractViewPopup {
 		ro.toolbar = dom.querySelector('.b-header-toolbar');
 		ro.els = [dom.querySelector('.textAreaParent'), dom.querySelector('.attachmentAreaParent')];
 
-		this.editor(editor => editor.modeWysiwyg());
+		this.editor(editor => editor[this.isPlainEditor()?'modePlain':'modeWysiwyg']());
 
 		// Fullscreen must be on app, else other popups fail
 		const el = doc.getElementById('rl-app');
@@ -1149,14 +1265,11 @@ class ComposePopupView extends AbstractViewPopup {
 			event = 'webkit' + event;
 		}
 		if (el.requestFullscreen) {
-			if (!doc.exitFullscreen && doc.webkitExitFullscreen) {
-				doc.exitFullscreen = doc.webkitExitFullscreen;
-			}
 			this.oContent = el;
 			el.addEventListener(event, () =>
 				ThemeStore.isMobile()
 				&& this.modalVisibility()
-				&& (doc.fullscreenElement || doc.webkitFullscreenElement) !== el
+				&& (getFullscreenElement() !== el)
 				&& this.skipCommand()
 			);
 		}
@@ -1179,132 +1292,6 @@ class ComposePopupView extends AbstractViewPopup {
 				oJua && oJua.cancel(id);
 			}
 		};
-	}
-
-	initUploader() {
-		if (this.composeUploaderButton()) {
-			const uploadCache = {},
-				attachmentSizeLimit = pInt(SettingsGet('AttachmentLimit')),
-				oJua = new Jua({
-					action: serverRequest('Upload'),
-					name: 'uploader',
-					queueSize: 2,
-					multipleSizeLimit: 50,
-					clickElement: this.composeUploaderButton(),
-					dragAndDropElement: this.composeUploaderDropPlace()
-				});
-
-			if (oJua) {
-				oJua
-					// .on('onLimitReached', (limit) => {
-					// 	alert(limit);
-					// })
-					.on('onDragEnter', () => {
-						this.dragAndDropOver(true);
-					})
-					.on('onDragLeave', () => {
-						this.dragAndDropOver(false);
-					})
-					.on('onBodyDragEnter', () => {
-						this.attachmentsPlace(true);
-						this.dragAndDropVisible(true);
-					})
-					.on('onBodyDragLeave', () => {
-						this.dragAndDropVisible(false);
-					})
-					.on('onProgress', (id, loaded, total) => {
-						let item = uploadCache[id];
-						if (!item) {
-							item = this.getAttachmentById(id);
-							if (item) {
-								uploadCache[id] = item;
-							}
-						}
-
-						if (item) {
-							item.progress(Math.floor((loaded / total) * 100));
-						}
-					})
-					.on('onSelect', (sId, oData) => {
-						this.dragAndDropOver(false);
-
-						const fileName = undefined === oData.FileName ? '' : oData.FileName.toString(),
-							size = pInt(oData.Size, null),
-							attachment = new ComposeAttachmentModel(sId, fileName, size);
-
-						attachment.cancel = this.cancelAttachmentHelper(sId, oJua);
-
-						this.attachments.push(attachment);
-
-						this.attachmentsPlace(true);
-
-						if (0 < size && 0 < attachmentSizeLimit && attachmentSizeLimit < size) {
-							attachment
-								.waiting(false)
-								.uploading(true)
-								.complete(true)
-								.error(i18n('UPLOAD/ERROR_FILE_IS_TOO_BIG'));
-
-							return false;
-						}
-
-						return true;
-					})
-					.on('onStart', (id) => {
-						let item = uploadCache[id];
-						if (!item) {
-							item = this.getAttachmentById(id);
-							if (item) {
-								uploadCache[id] = item;
-							}
-						}
-
-						if (item) {
-							item
-								.waiting(false)
-								.uploading(true)
-								.complete(false);
-						}
-					})
-					.on('onComplete', (id, result, data) => {
-						const attachment = this.getAttachmentById(id),
-							errorCode = data && data.Result && data.Result.ErrorCode ? data.Result.ErrorCode : null,
-							attachmentJson = result && data && data.Result && data.Result.Attachment ? data.Result.Attachment : null;
-
-						let error = '';
-						if (null !== errorCode) {
-							error = getUploadErrorDescByCode(errorCode);
-						} else if (!attachmentJson) {
-							error = i18n('UPLOAD/ERROR_UNKNOWN');
-						}
-
-						if (attachment) {
-							if (error && error.length) {
-								attachment
-									.waiting(false)
-									.uploading(false)
-									.complete(true)
-									.error(error);
-							} else if (attachmentJson) {
-								attachment
-									.waiting(false)
-									.uploading(false)
-									.complete(true);
-
-								attachment.initByUploadJson(attachmentJson);
-							}
-
-							if (undefined === uploadCache[id]) {
-								delete uploadCache[id];
-							}
-						}
-					});
-
-				this.addAttachmentEnabled(true).dragAndDropEnabled(true);
-			} else {
-				this.addAttachmentEnabled(false).dragAndDropEnabled(false);
-			}
-		}
 	}
 
 	/**
@@ -1460,7 +1447,7 @@ class ComposePopupView extends AbstractViewPopup {
 		this.dragAndDropVisible(false);
 
 		this.draftFolder('');
-		this.draftUid('');
+		this.draftUid(0);
 
 		this.sending(false);
 		this.saving(false);

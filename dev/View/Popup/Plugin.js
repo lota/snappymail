@@ -2,7 +2,7 @@ import ko from 'ko';
 
 import { Scope } from 'Common/Enums';
 import { getNotification, i18n } from 'Common/Translator';
-import { isNonEmptyArray } from 'Common/Utils';
+import { arrayLength } from 'Common/Utils';
 
 import Remote from 'Remote/Admin/Fetch';
 
@@ -16,17 +16,20 @@ class PluginPopupView extends AbstractViewPopup {
 
 		this.addObservables({
 			saveError: '',
+			id: '',
 			name: '',
 			readme: ''
 		});
 
 		this.configures = ko.observableArray();
 
-		this.hasReadme = ko.computed(() => !!this.readme());
-		this.hasConfiguration = ko.computed(() => 0 < this.configures().length);
+		this.addComputables({
+			hasReadme: () => !!this.readme(),
+			hasConfiguration: () => 0 < this.configures().length
+		});
 
 		this.bDisabeCloseOnEsc = true;
-		this.sDefaultScope = Scope.All;
+		this.keyScope.scope = Scope.All;
 
 		this.tryToClosePopup = this.tryToClosePopup.debounce(200);
 
@@ -36,15 +39,17 @@ class PluginPopupView extends AbstractViewPopup {
 	}
 
 	saveCommand() {
-		const list = {};
-		list.Name = this.name();
+		const list = {
+			Id: this.id(),
+			Settings: {}
+		};
 
 		this.configures.forEach(oItem => {
 			let value = oItem.value();
 			if (false === value || true === value) {
-				value = value ? '1' : '0';
+				value = value ? 1 : 0;
 			}
-			list['_' + oItem.Name] = value;
+			list.Settings[oItem.Name] = value;
 		});
 
 		this.saveError('');
@@ -56,16 +61,18 @@ class PluginPopupView extends AbstractViewPopup {
 	}
 
 	onShow(oPlugin) {
+		this.id('');
 		this.name('');
 		this.readme('');
 		this.configures([]);
 
 		if (oPlugin) {
+			this.id(oPlugin.Id);
 			this.name(oPlugin.Name);
 			this.readme(oPlugin.Readme);
 
 			const config = oPlugin.Config;
-			if (isNonEmptyArray(config)) {
+			if (arrayLength(config)) {
 				this.configures(
 					config.map(item => ({
 						value: ko.observable(item[0]),
@@ -94,9 +101,8 @@ class PluginPopupView extends AbstractViewPopup {
 		shortcuts.add('escape', '', Scope.All, () => {
 			if (this.modalVisibility()) {
 				this.tryToClosePopup();
+				return false;
 			}
-
-			return false;
 		});
 	}
 }

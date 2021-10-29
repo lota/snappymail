@@ -1,7 +1,7 @@
 import { i18nToNodes } from 'Common/Translator';
 import { doc, createElement } from 'Common/Globals';
 import { SaveSettingsStep } from 'Common/Enums';
-import { isNonEmptyArray, isFunction } from 'Common/Utils';
+import { arrayLength, isFunction } from 'Common/Utils';
 
 const
 	koValue = value => !ko.isObservable(value) && isFunction(value) ? value() : ko.unwrap(value);
@@ -21,7 +21,7 @@ ko.bindingHandlers.tooltipErrorTip = {
 };
 
 ko.bindingHandlers.onEnter = {
-	init: (element, fValueAccessor, fAllBindingsAccessor, viewModel) => {
+	init: (element, fValueAccessor, fAllBindings, viewModel) => {
 		let fn = event => {
 			if ('Enter' == event.key) {
 				element.dispatchEvent(new Event('change'));
@@ -34,7 +34,7 @@ ko.bindingHandlers.onEnter = {
 };
 
 ko.bindingHandlers.onSpace = {
-	init: (element, fValueAccessor, fAllBindingsAccessor, viewModel) => {
+	init: (element, fValueAccessor, fAllBindings, viewModel) => {
 		let fn = event => {
 			if (' ' == event.key) {
 				fValueAccessor().call(viewModel, event);
@@ -73,7 +73,7 @@ ko.bindingHandlers.title = {
 };
 
 ko.bindingHandlers.command = {
-	init: (element, fValueAccessor, fAllBindingsAccessor, viewModel, bindingContext) => {
+	init: (element, fValueAccessor, fAllBindings, viewModel, bindingContext) => {
 		const command = fValueAccessor();
 
 		if (!command || !command.enabled || !command.canExecute) {
@@ -83,7 +83,7 @@ ko.bindingHandlers.command = {
 		ko.bindingHandlers['FORM'==element.nodeName ? 'submit' : 'click'].init(
 			element,
 			fValueAccessor,
-			fAllBindingsAccessor,
+			fAllBindings,
 			viewModel,
 			bindingContext
 		);
@@ -136,7 +136,7 @@ ko.extenders.limitedList = (target, limitedList) => {
 					const currentValue = ko.unwrap(target),
 						list = ko.unwrap(limitedList);
 
-					if (isNonEmptyArray(list)) {
+					if (arrayLength(list)) {
 						if (list.includes(newValue)) {
 							target(newValue);
 						} else if (list.includes(currentValue, list)) {

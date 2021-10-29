@@ -1,38 +1,38 @@
 <div id="rl-sub-left" class="messageList g-ui-user-select-none"
-	data-bind="css: {'message-selected': isMessageSelected, 'message-focused': !messageListFocused() }">
+	data-bind="css: {'message-selected': isMessageSelected, 'focused': messageListFocused() }">
 	<div class="toolbar">
 		<div class="btn-toolbar">
 			<a class="btn btn-thin-2 fontastic show-mobile" data-bind="click: hideLeft, visible: !leftPanelDisabled()">❮</a>
 			<a class="btn btn-thin-2 fontastic show-mobile" data-bind="click: showLeft, visible: leftPanelDisabled()">❯</a>
-			<a class="btn buttonCompose show-mobile" data-bind="click: composeClick, css: {'btn-warning': composeInEdit, 'btn-success': !composeInEdit()}, visible: allowComposer && mobileCheckedStateHide()" data-i18n="[title]FOLDER_LIST/BUTTON_NEW_MESSAGE">
+			<a class="btn buttonCompose show-mobile" data-bind="click: composeClick, css: {'btn-warning': composeInEdit, 'btn-success': !composeInEdit()}, visible: mobileCheckedStateHide()" data-i18n="[title]FOLDER_LIST/BUTTON_NEW_MESSAGE">
 				<i class="icon-paper-plane"></i>
 			</a>
-			<a class="btn" data-bind="command: reloadCommand, visible: allowReload && mobileCheckedStateHide()" data-i18n="[title]MESSAGE_LIST/BUTTON_RELOAD">
+			<a class="btn" data-bind="command: reloadCommand, visible: mobileCheckedStateHide()" data-i18n="[title]MESSAGE_LIST/BUTTON_RELOAD">
 				<i class="icon-spinner not-animated"></i>
 			</a>
 			<!-- ko if: !newMoveToFolder -->
-			<div class="btn-group dropdown colored-toggle hide-mobile" data-bind="visible: allowMessageListActions, registerBootstrapDropdown: true, openDropdownTrigger: moveDropdownTrigger">
-				<a id="move-dropdown-id" href="#" tabindex="-1" class="btn dropdown-toggle buttonMove" data-toggle="dropdown" data-bind="command: moveCommand" data-i18n="[title]GLOBAL/MOVE_TO">
+			<div class="btn-group dropdown colored-toggle hide-mobile" data-bind="registerBootstrapDropdown: true, openDropdownTrigger: moveDropdownTrigger">
+				<a id="move-dropdown-id" href="#" tabindex="-1" class="btn dropdown-toggle buttonMove" data-bind="command: moveCommand" data-i18n="[title]GLOBAL/MOVE_TO">
 					<i class="icon-copy visible-on-ctrl-btn"></i>
 					<i class="fontastic hidden-on-ctrl-btn">📁</i>
 					<span class="caret"></span>
 				</a>
 				<ul class="dropdown-menu g-ui-menu" role="menu" aria-labelledby="move-dropdown-id" role="menu" data-bind="foreach: folderMenuForMove">
-					<li class="e-item" role="presentation" data-bind="css: { 'disabled': disabled, 'dividerbar': dividerbar }, click: function (mdata, oEvent) { if (!disabled) $root.moveSelectedMessagesToFolder(id, oEvent && !!oEvent.ctrlKey); }">
+					<li class="e-item" role="presentation" data-bind="css: { 'disabled': disabled }, click: function (mdata, oEvent) { if (!disabled) $root.moveSelectedMessagesToFolder(id, oEvent && !!oEvent.ctrlKey); }">
 						<a class="e-link menuitem" href="#" tabindex="-1" data-bind="text: name"></a>
 					</li>
 				</ul>
 			</div>
 			<!-- /ko -->
 			<!-- ko if: newMoveToFolder -->
-			<div class="btn-group" data-bind="visible: allowMessageListActions && mobileCheckedStateShow()">
+			<div class="btn-group" data-bind="visible: mobileCheckedStateShow()">
 				<a id="move-dropdown-id" href="#" tabindex="-1" class="btn buttonMove" data-bind="command: moveNewCommand" data-i18n="[title]GLOBAL/MOVE_TO">
 					<i class="icon-copy visible-on-ctrl-btn"></i>
 					<i class="fontastic hidden-on-ctrl-btn">📁</i>
 				</a>
 			</div>
 			<!-- /ko -->
-			<div class="btn-group" data-bind="visible: allowMessageListActions && mobileCheckedStateShow()">
+			<div class="btn-group" data-bind="visible: mobileCheckedStateShow()">
 				<a class="btn button-archive"
 					data-bind="visible: isArchiveVisible, command: archiveCommand" data-i18n="[title]GLOBAL/TO_ARCHIVE">
 					<i class="icon-archive"></i>
@@ -45,10 +45,10 @@
 				<a class="btn button-delete fontastic"
 					data-bind="command: deleteCommand" data-i18n="[title]GLOBAL/DELETE">🗑</a>
 			</div>
-			<div class="btn-group dropdown colored-toggle" data-bind="visible: allowComposer || allowMessageListActions || allowDangerousActions, registerBootstrapDropdown: true, openDropdownTrigger: moreDropdownTrigger">
-				<a id="more-list-dropdown-id" class="btn dropdown-toggle fontastic" href="#" tabindex="-1" data-toggle="dropdown" data-i18n="[title]GLOBAL/MORE">☰</a>
+			<div class="btn-group dropdown colored-toggle" data-bind="registerBootstrapDropdown: true, openDropdownTrigger: moreDropdownTrigger">
+				<a id="more-list-dropdown-id" class="btn dropdown-toggle fontastic" href="#" tabindex="-1" data-i18n="[title]GLOBAL/MORE">☰</a>
 				<ul class="dropdown-menu g-ui-menu" role="menu" aria-labelledby="more-list-dropdown-id">
-					<div data-bind="visible: allowMessageListActions">
+					<div>
 						<li class="e-item" role="presentation" data-bind="click: listUnsetSeen, css: {'disabled': !hasCheckedOrSelectedLines()}">
 							<a class="e-link menuitem" href="#" tabindex="-1">
 								<i class="icon-none"></i>
@@ -80,7 +80,7 @@
 							</a>
 						</li>
 					</div>
-					<li class="e-item dividerbar" role="presentation" data-bind="visible: allowComposer, command: multyForwardCommand">
+					<li class="e-item dividerbar" role="presentation" data-bind="command: multyForwardCommand">
 						<a class="e-link menuitem" href="#" tabindex="-1">
 							<i class="fontastic">↞</i>
 							<span data-i18n="MESSAGE_LIST/BUTTON_MULTY_FORWARD"></span>
@@ -101,7 +101,7 @@
 				</ul>
 			</div>
 			<div class="btn-group dropdown sortFolder" data-bind="visible: sortSupported() && mobileCheckedStateHide(), registerBootstrapDropdown: true, openDropdownTrigger: sortDropdownTrigger">
-				<a id="sort-list-dropdown-id" class="btn dropdown-toggle fontastic" href="#" tabindex="-1" data-toggle="dropdown" data-i18n="[title]MESSAGE_LIST/SORT" data-bind="text: sortText">⬇</a>
+				<a id="sort-list-dropdown-id" class="btn dropdown-toggle fontastic" href="#" tabindex="-1" data-i18n="[title]MESSAGE_LIST/SORT" data-bind="text: sortText">⬇</a>
 				<ul class="dropdown-menu g-ui-menu" role="menu" aria-labelledby="sort-list-dropdown-id">
 					<li class="e-item" role="presentation" data-sort="DATE" data-bind="click: changeSort">
 						<a class="e-link menuitem" href="#" tabindex="-1">
@@ -164,56 +164,42 @@
 						<a class="close" data-bind="click: cancelSearch, visible: '' !== messageListSearchDesc()">×</a>
 						<input type="search" class="span4 inputSearch" tabindex="-1" placeholder="Search" autocorrect="off" autocapitalize="off" data-i18n="[placeholder]GLOBAL/SEARCH" data-bind="value: inputProxyMessageListSearch, onEnter: searchEnterAction, hasfocus: inputMessageListSearchFocus" />
 					</div>
-					<a class="btn buttonMoreSearch" data-bind="visible: allowSearchAdv, click: advancedSearchClick">
-						<span class="caret"></span>
-					</a>
+					<a class="btn buttonMoreSearch" data-bind="visible: allowSearchAdv, click: advancedSearchClick">▼</a>
 				</div>
 			</div>
 		</div>
 		<div class="b-content" data-bind="initDom: dragOverBodyArea">
-			<div class="listThreadUidDesc" data-bind="visible: '' !== messageListEndThreadUid(), click: cancelThreadUid">
-				<i class="fontastic" data-bind="click: cancelThreadUid">⬅</i>
+			<div class="listThreadUidDesc" data-bind="visible: 0 < messageListEndThreadUid(), click: cancelThreadUid">
+				<i class="fontastic">⬅</i>
 				<span data-i18n="MESSAGE_LIST/BACK_TO_MESSAGE_LIST"></span>
 			</div>
 			<div class="listSearchDesc" data-bind="visible: '' !== messageListSearchDesc(), text: messageListSearchDesc"></div>
 			<div class="listDragOver" data-bind="css: {'viewAppendArea': dragOver() && '' === messageListError() && !popupVisibility(), 'dragOverEnter': dragOverEnter }, initDom: dragOverArea">
-				<i class="fontastic e-icon">⬇</i>
+				<i class="fontastic">⬇</i>
 				<span data-i18n="MESSAGE_LIST/PUT_MESSAGE_HERE"></span>
 			</div>
 			<div class="listClear" data-bind="visible: clearListIsVisible()">
-				<span class="g-ui-link" data-i18n="MESSAGE_LIST/BUTTON_EMPTY_FOLDER" data-bind="command: clearCommand"></span>
+				<a href="#" class="g-ui-link" data-i18n="MESSAGE_LIST/BUTTON_EMPTY_FOLDER" data-bind="command: clearCommand"></a>
 			</div>
-			<div class="listError" data-bind="visible: !dragOver() && '' !== messageListError()">
-				<span class="error" data-bind="text: messageListError"></span>
-			</div>
-			<div class="listEmptyList" data-bind="visible: !dragOver() && 0 === messageList().length && !messageListCompleteLoadingThrottle() && '' === messageListError() && '' === messageListSearch()"
-				data-i18n="MESSAGE_LIST/EMPTY_LIST"></div>
-			<div class="listEmptyListLoading" data-bind="visible: !dragOver() && 0 === messageList().length &&
+			<div class="listError error" data-bind="visible: !dragOver() && '' !== messageListError(), text: messageListError"></div>
+			<div class="listEmptyMessage" data-bind="visible: listEmptyMessage(), text: listEmptyMessage()"></div>
+			<div class="listLoading" data-bind="visible: !dragOver() && 0 === messageList().length &&
 				messageListCompleteLoadingThrottle() && '' === messageListError()">
+				<i class="icon-spinner"></i>
 				<span data-i18n="GLOBAL/LOADING"></span>
-				<span class="textLoadingAnimationD1">.</span>
-				<span class="textLoadingAnimationD2">.</span>
-				<span class="textLoadingAnimationD3">.</span>
 			</div>
-			<div class="listEmptySearchList" data-bind="visible: !dragOver() && 0 === messageList().length && !messageListCompleteLoadingThrottle() && '' === messageListError() && '' !== messageListSearch()"
-				data-i18n="MESSAGE_LIST/EMPTY_SEARCH_LIST"></div>
 			<div data-bind="dragmessages: getDragData">
 				<div class="messageListPlace" data-bind="foreach: messageList">
 
 					<div class="messageListItem" data-bind="css: lineAsCss()">
 						<div class="checkboxMessage fontastic" data-bind="text: checked() ? '☑' : '☐'"></div>
 
-						<div class="flagParent">
-							<i class="flagOn fontastic">★</i>
-							<i class="flagOnHalf fontastic">☆</i>
-							<i class="flagOff fontastic">☆</i>
-							<!-- ⚐⚑ -->
-						</div>
+						<div class="flagParent fontastic"></div>
 
-						<div class="senderParent actionHandle">
-							<i class="replyFlag fontastic">←</i>
-							<i class="forwardFlag fontastic">→</i>
-							<span class="sender" data-bind="text: senderEmailsString, attr: {'title': senderClearEmailsString}"></span>
+						<div class="senderParent actionHandle" data-bind="attr: {'title': senderClearEmailsString}">
+							<!-- ko if: isAnswered --><i class="replyFlag fontastic">←</i><!-- /ko -->
+							<!-- ko if: isForwarded --><i class="forwardFlag fontastic">→</i><!-- /ko -->
+							<!-- ko text: senderEmailsString --><!-- /ko -->
 						</div>
 
 						<div class="attachmentParent actionHandle">
@@ -221,19 +207,16 @@
 						</div>
 
 						<div class="subjectParent actionHandle">
-							<b class="importantMark">!</b>
-							<span class="emptySubjectText" data-bind="text: $root.emptySubjectValue"></span>
-							<span class="subject" data-bind="text: subject"></span>
+							<!-- ko if: isImportant --><b class="importantMark">!</b><!-- /ko -->
+							<!-- ko text: subject || $root.emptySubjectValue --><!-- /ko -->
 						</div>
 
 						<div class="sizeParent actionHandle" data-bind="text: friendlySize()"></div>
 
-						<div class="threadsParent" data-bind="visible: 1 < threadsLen()">
-							<span class="threads-len">
-								<span class="threads-len-data">
-									<span data-bind="text: threadsLen"></span>
-									<i class="icon-right-mini"></i>
-								</span>
+						<div class="threads-len" data-bind="visible: 1 < threadsLen()">
+							<span>
+								<!-- ko text: threadsLen --><!-- /ko -->
+								›
 							</span>
 						</div>
 
@@ -246,7 +229,7 @@
 		</div>
 		<div class="b-footer thm-message-list-bottom-toolbar">
 			<span data-bind="visible: 0 < userUsageProc(), attr: { title: quotaTooltip() }" class="e-quota">
-				<span data-bind="text: userUsageProc"></span>%
+				<!-- ko text: userUsageProc --><!-- /ko -->%
 			</span>
 			<div class="pull-right">
 				<!-- ko template: { name: 'Paginator', data: messageListPaginator } --><!-- /ko -->

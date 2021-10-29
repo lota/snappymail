@@ -1,11 +1,14 @@
 import ko from 'ko';
 
 import { Notification } from 'Common/Enums';
-import { ClientSideKeyName } from 'Common/EnumsUser';
+import { ClientSideKeyName, FolderMetadataKeys } from 'Common/EnumsUser';
 import { Settings } from 'Common/Globals';
 import { getNotification } from 'Common/Translator';
 
 import { removeFolderFromCacheList } from 'Common/Cache';
+import { Capa } from 'Common/Enums';
+import { defaultOptionsAfterRender } from 'Common/Utils';
+import { initOnStartOrLangChange, i18n } from 'Common/Translator';
 
 import * as Local from 'Storage/Client';
 
@@ -19,8 +22,27 @@ import { showScreenPopup } from 'Knoin/Knoin';
 import { FolderCreatePopupView } from 'View/Popup/FolderCreate';
 import { FolderSystemPopupView } from 'View/Popup/FolderSystem';
 
-export class FoldersUserSettings {
+const folderForDeletion = ko.observable(null).deleteAccessHelper();
+
+export class FoldersUserSettings /*extends AbstractViewSettings*/ {
 	constructor() {
+		this.showKolab = Settings.capa(Capa.Kolab) && FolderUserStore.metadataSupported();
+		this.defaultOptionsAfterRender = defaultOptionsAfterRender;
+		this.kolabTypeOptions = ko.observableArray();
+		let i18nFilter = key => i18n('SETTINGS_FOLDERS/TYPE_' + key);
+		initOnStartOrLangChange(()=>{
+			this.kolabTypeOptions([
+				{ id: '', name: '' },
+				{ id: 'event', name: i18nFilter('CALENDAR') },
+				{ id: 'contact', name: i18nFilter('CONTACTS') },
+				{ id: 'task', name: i18nFilter('TASKS') },
+				{ id: 'note', name: i18nFilter('NOTES') },
+				{ id: 'file', name: i18nFilter('FILES') },
+				{ id: 'journal', name: i18nFilter('JOURNAL') },
+				{ id: 'configuration', name: i18nFilter('CONFIGURATION') }
+			]);
+		});
+
 		this.displaySpecSetting = FolderUserStore.displaySpecSetting;
 		this.folderList = FolderUserStore.folderList;
 		this.folderListOptimized = FolderUserStore.folderListOptimized;
@@ -36,12 +58,12 @@ export class FoldersUserSettings {
 			return loading || creating || deleting || renaming;
 		});
 
-		this.folderForDeletion = ko.observable(null).deleteAccessHelper();
+		this.folderForDeletion = folderForDeletion;
 
 		this.folderForEdit = ko.observable(null).extend({ toggleSubscribeProperty: [this, 'edited'] });
 
 		this.useImapSubscribe = Settings.app('useImapSubscribe');
-		this.hideUnsubscribed.subscribe(value => Remote.saveSetting('HideUnsubscribed', value ? 1 : 0));
+		SettingsUserStore.hideUnsubscribed.subscribe(value => Remote.saveSetting('HideUnsubscribed', value ? 1 : 0));
 	}
 
 	folderEditOnEnter(folder) {
@@ -91,52 +113,50 @@ export class FoldersUserSettings {
 			folderToRemove.deleteAccess() &&
 			0 === folderToRemove.privateMessageCountAll()
 		) {
-			this.folderForDeletion(null);
+			folderForDeletion(null);
 
 			if (folderToRemove) {
-				const fRemoveFolder = function(folder) {
-					if (folderToRemove === folder) {
-						return true;
-					}
-					folder.subFolders.remove(fRemoveFolder);
-					return false;
-				};
-
 				Local.set(ClientSideKeyName.FoldersLashHash, '');
 
-				FolderUserStore.folderList.remove(fRemoveFolder);
-
-				rl.app.foldersPromisesActionHelper(
-					Remote.folderDelete(folderToRemove.fullNameRaw),
-					Notification.CantDeleteFolder
-				);
-
-				removeFolderFromCacheList(folderToRemove.fullNameRaw);
+				// rl.app.foldersPromisesActionHelper
+				Remote.abort('Folders')
+					.folderDelete(folderToRemove.fullNameRaw)
+					.then(
+						() => {
+							folderToRemove.selectable(false)
+							removeFolderFromCacheList(folderToRemove.fullNameRaw);
+							FolderUserStore.folderList(FolderUserStore.folderList.filter(folder => folder !== folderToRemove));
+						},
+						error => {
+							FolderUserStore.folderListError(
+								getNotification(error.code, '', Notification.CantDeleteFolder)
+								+ '.\n' + error.message
+							);
+						}
+					);
 			}
 		} else if (0 < folderToRemove.privateMessageCountAll()) {
 			FolderUserStore.folderListError(getNotification(Notification.CantDeleteNonEmptyFolder));
 		}
 	}
 
-	subscribeFolder(folder) {
+	toggleFolderKolabType(folder, event) {
+		let type = event.target.value;
+		// TODO: append '.default' ?
+		Remote.folderSetMetadata(()=>0, folder.fullNameRaw, FolderMetadataKeys.KolabFolderType, type);
+		folder.kolabType(type);
+	}
+
+	toggleFolderSubscription(folder) {
+		let subscribe = !folder.subscribed();
 		Local.set(ClientSideKeyName.FoldersLashHash, '');
-		Remote.folderSetSubscribe(()=>{}, folder.fullNameRaw, true);
-		folder.subscribed(true);
+		Remote.folderSetSubscribe(()=>0, folder.fullNameRaw, subscribe);
+		folder.subscribed(subscribe);
 	}
 
-	unSubscribeFolder(folder) {
-		Local.set(ClientSideKeyName.FoldersLashHash, '');
-		Remote.folderSetSubscribe(()=>{}, folder.fullNameRaw, false);
-		folder.subscribed(false);
-	}
-
-	checkableTrueFolder(folder) {
-		Remote.folderSetCheckable(()=>{}, folder.fullNameRaw, true);
-		folder.checkable(true);
-	}
-
-	checkableFalseFolder(folder) {
-		Remote.folderSetCheckable(()=>{}, folder.fullNameRaw, false);
-		folder.checkable(false);
+	toggleFolderCheckable(folder) {
+		let checkable = !folder.checkable();
+		Remote.folderSetCheckable(()=>0, folder.fullNameRaw, checkable);
+		folder.checkable(checkable);
 	}
 }

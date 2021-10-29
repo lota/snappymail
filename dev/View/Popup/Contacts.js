@@ -7,7 +7,7 @@ import {
 
 import { ComposeType } from 'Common/EnumsUser';
 
-import { isNonEmptyArray, pInt } from 'Common/Utils';
+import { arrayLength, pInt } from 'Common/Utils';
 import { delegateRunOnDestroy, computedPaginatorHelper, showMessageComposer } from 'Common/UtilsUser';
 
 import { Selector } from 'Common/Selector';
@@ -163,7 +163,7 @@ class ContactsPopupView extends AbstractViewPopup {
 			bccEmails = null;
 
 		const aC = this.contactsCheckedOrSelected();
-		if (isNonEmptyArray(aC)) {
+		if (arrayLength(aC)) {
 			aE = aC.map(oItem => {
 				if (oItem) {
 					const data = oItem.getNameAndEmailHelper(),
@@ -180,7 +180,7 @@ class ContactsPopupView extends AbstractViewPopup {
 			aE = aE.filter(value => !!value);
 		}
 
-		if (isNonEmptyArray(aE)) {
+		if (arrayLength(aE)) {
 			this.bBackToCompose = false;
 
 			hideScreenPopup(ContactsPopupView);
@@ -192,7 +192,6 @@ class ContactsPopupView extends AbstractViewPopup {
 				case 'bcc':
 					bccEmails = aE;
 					break;
-				case 'to':
 				default:
 					toEmails = aE;
 					break;
@@ -252,7 +251,7 @@ class ContactsPopupView extends AbstractViewPopup {
 	}
 
 	syncCommand() {
-		rl.app.contactsSync(iError => {
+		ContactUserStore.sync(iError => {
 			iError && alert(getNotification(iError));
 
 			this.reloadContactList(true);
@@ -322,32 +321,6 @@ class ContactsPopupView extends AbstractViewPopup {
 
 	exportCsv() {
 		rl.app.download(serverRequestRaw('ContactsCsv'));
-	}
-
-	initUploader() {
-		if (this.importUploaderButton()) {
-			const j = new Jua({
-				action: serverRequest('UploadContacts'),
-				name: 'uploader',
-				queueSize: 1,
-				multipleSizeLimit: 1,
-				disableMultiple: true,
-				disableDocumentDropPrevent: true,
-				clickElement: this.importUploaderButton()
-			});
-
-			if (j) {
-				j.on('onStart', () => {
-					ContactUserStore.importing(true);
-				}).on('onComplete', (id, result, data) => {
-					ContactUserStore.importing(false);
-					this.reloadContactList();
-					if (!id || !result || !data || !data.Result) {
-						alert(i18n('CONTACTS/ERROR_IMPORT_FILE'));
-					}
-				});
-			}
-		}
 	}
 
 	removeCheckedOrSelectedContactsFromList() {
@@ -447,7 +420,7 @@ class ContactsPopupView extends AbstractViewPopup {
 				let count = 0,
 					list = [];
 
-				if (!iError && isNonEmptyArray(data.Result.List)) {
+				if (!iError && arrayLength(data.Result.List)) {
 					data.Result.List.forEach(item => {
 						item = ContactModel.reviveFromJson(item);
 						item && list.push(item);
@@ -494,12 +467,33 @@ class ContactsPopupView extends AbstractViewPopup {
 			}
 		});
 
-		this.initUploader();
+		// initUploader
+
+		if (this.importUploaderButton()) {
+			const j = new Jua({
+				action: serverRequest('UploadContacts'),
+				limit: 1,
+				disableDocumentDropPrevent: true,
+				clickElement: this.importUploaderButton()
+			});
+
+			if (j) {
+				j.on('onStart', () => {
+					ContactUserStore.importing(true);
+				}).on('onComplete', (id, result, data) => {
+					ContactUserStore.importing(false);
+					this.reloadContactList();
+					if (!id || !result || !data || !data.Result) {
+						alert(i18n('CONTACTS/ERROR_IMPORT_FILE'));
+					}
+				});
+			}
+		}
 	}
 
 	onShow(bBackToCompose, sLastComposeFocusedField) {
-		this.bBackToCompose = undefined === bBackToCompose ? false : !!bBackToCompose;
-		this.sLastComposeFocusedField = undefined === sLastComposeFocusedField ? '' : sLastComposeFocusedField;
+		this.bBackToCompose = !!bBackToCompose;
+		this.sLastComposeFocusedField = sLastComposeFocusedField;
 
 		rl.route.off();
 		this.reloadContactList(true);

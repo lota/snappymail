@@ -17,6 +17,8 @@ namespace MailSo\Imap;
  */
 class FolderInformation
 {
+	use Traits\Status;
+
 	/**
 	 * @var string
 	 */
@@ -30,55 +32,23 @@ class FolderInformation
 	/**
 	 * @var array
 	 */
-	public $Flags;
+	public $Flags = array();
 
 	/**
 	 * @var array
 	 */
-	public $PermanentFlags;
+	public $PermanentFlags = array();
 
 	/**
+	 * https://datatracker.ietf.org/doc/html/rfc3501#section-7.3.1
 	 * @var int
 	 */
-	public $Exists;
-
-	/**
-	 * @var int
-	 */
-	public $Recent;
-
-	/**
-	 * @var string
-	 */
-	public $Uidvalidity;
-
-	/**
-	 * @var int
-	 */
-	public $Unread;
-
-	/**
-	 * @var string
-	 */
-	public $Uidnext;
-
-	/**
-	 * @var string
-	 */
-	public $HighestModSeq;
+	public $Exists = null;
 
 	function __construct(string $sFolderName, bool $bIsWritable)
 	{
 		$this->FolderName = $sFolderName;
 		$this->IsWritable = $bIsWritable;
-		$this->Exists = null;
-		$this->Recent = null;
-		$this->Flags = array();
-		$this->PermanentFlags = array();
-
-		$this->Unread = null;
-		$this->Uidnext = null;
-		$this->HighestModSeq = null;
 	}
 
 	public function IsFlagSupported(string $sFlag) : bool

@@ -1,7 +1,6 @@
 import ko from 'ko';
 
 import { SMAudio } from 'Common/Audio';
-import { SettingsGet } from 'Common/Globals';
 import * as Links from 'Common/Links';
 
 /**
@@ -41,13 +40,13 @@ export const NotificationUserStore = new class {
 
 		this.enableDesktopNotification = ko.observable(false)/*.extend({ notify: 'always' })*/;
 
-		this.isDesktopNotificationDenied = ko.observable(NotificationsDenied());
+		this.isDesktopNotificationAllowed = ko.observable(!NotificationsDenied());
 
 		this.enableDesktopNotification.subscribe(value => {
 			DesktopNotifications = !!value;
 			if (value && HTML5Notification && !NotificationsGranted()) {
 				HTML5Notification.requestPermission(() =>
-					this.isDesktopNotificationDenied(NotificationsDenied())
+					this.isDesktopNotificationAllowed(!NotificationsDenied())
 				);
 			}
 		});
@@ -100,10 +99,5 @@ export const NotificationUserStore = new class {
 				setTimeout(() => notification.close(), 7000);
 			}
 		}
-	}
-
-	populate() {
-		this.enableSoundNotification(!!SettingsGet('SoundNotification'));
-		this.enableDesktopNotification(!!SettingsGet('DesktopNotifications'));
 	}
 };

@@ -145,7 +145,8 @@
 		"PGP_SIGNED_MESSAGE_DESC": "OpenPGP-signierte Nachricht (klicken, um zu überprüfen)",
 		"PGP_ENCRYPTED_MESSAGE_DESC": "OpenPGP-verschlüsselte Nachricht (klicken, um zu entschlüsseln)",
 		"LINK_DOWNLOAD_AS_ZIP": "Als ZIP-Datei herunterladen",
-		"SPAM_SCORE": "Spam-Score"
+		"SPAM_SCORE": "Spam-Score",
+		"HAS_VIRUS_WARNING": "WARNUNG: Virus erkannt"
 	},
 	"READ_RECEIPT": {
 		"SUBJECT": "Empfangsbestätigung (angezeigt) - %SUBJECT%",
@@ -354,7 +355,6 @@
 		"LABEL_ACCOUNTS_NAME": "Konten",
 		"LABEL_IDENTITIES_NAME": "Identitäten",
 		"LABEL_FILTERS_NAME": "Filter",
-		"LABEL_TEMPLATES_NAME": "Vorlagen",
 		"LABEL_SECURITY_NAME": "Sicherheit",
 		"LABEL_THEMES_NAME": "Themen"
 	},
@@ -396,6 +396,8 @@
 		"LABEL_SHOW_IMAGES": "In der Nachricht enthaltene Bilder immer anzeigen",
 		"LABEL_REMOVE_COLORS": "Entferne Hintergrund- und Textfarben aus der Nachricht",
 		"LABEL_MESSAGE_PER_PAGE": "Nachrichten pro Seite",
+		"LABEL_MARK_MESSAGE_READ_AFTER": "Nachricht als gelesen markieren nach",
+		"SECONDS": "Sekunden",
 		"LABEL_NOTIFICATIONS": "Benachrichtigungen",
 		"LABEL_SOUND_NOTIFICATION": "Benachrichtigungston",
 		"LABEL_CHROME_NOTIFICATION_DESC": "Popups einblenden, wenn neue Nachrichten vorhanden sind",
@@ -436,7 +438,14 @@
 		"HELP_DELETE_FOLDER": "Ordner löschen",
 		"HELP_SHOW_HIDE_FOLDER": "Ordner ein-\/ausblenden",
 		"HELP_CHECK_FOR_NEW_MESSAGES": "Auf neue Nachrichten prüfen\/nicht prüfen",
-		"HIDE_UNSUBSCRIBED": "Nicht abonnierte Ordner ausblenden"
+		"HIDE_UNSUBSCRIBED": "Nicht abonnierte Ordner ausblenden",
+		"TYPE_CALENDAR": "Kalender",
+		"TYPE_CONFIGURATION": "Konfiguration",
+		"TYPE_CONTACTS": "Kontakte",
+		"TYPE_FILES": "Dateien",
+		"TYPE_JOURNAL": "Journal",
+		"TYPE_NOTES": "Aufzeichnungen",
+		"TYPE_TASKS": "Aufgaben"
 	},
 	"SETTINGS_ACCOUNTS": {
 		"LEGEND_ACCOUNTS": "Konten",

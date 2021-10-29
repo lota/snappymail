@@ -17,26 +17,15 @@ ko.bindingHandlers['textInput'] = {
             }
         };
 
-        var deferUpdateModel = event => {
-            if (!timeoutHandle) {
-                // The elementValueBeforeEvent variable is set *only* during the brief gap between an
-                // event firing and the updateModel function running. This allows us to ignore model
-                // updates that are from the previous state of the element, usually due to techniques
-                // such as rateLimit. Such updates, if not ignored, can cause keystrokes to be lost.
-                elementValueBeforeEvent = element.value;
-                timeoutHandle = ko.utils.setTimeout(updateModel, 4);
-            }
-        };
-
         var updateView = () => {
             var modelValue = ko.utils.unwrapObservable(valueAccessor());
 
-            if (modelValue === null || modelValue === undefined) {
+            if (modelValue == null) {
                 modelValue = '';
             }
 
             if (elementValueBeforeEvent !== undefined && modelValue === elementValueBeforeEvent) {
-                ko.utils.setTimeout(updateView, 4);
+                setTimeout(updateView, 4);
                 return;
             }
 
@@ -49,7 +38,7 @@ ko.bindingHandlers['textInput'] = {
         };
 
         var onEvent = (event, handler) =>
-            ko.utils.registerEventHandler(element, event, handler);
+            element.addEventListener(event, handler);
 
         onEvent('input', updateModel);
 
@@ -62,7 +51,7 @@ ko.bindingHandlers['textInput'] = {
         ko.computed(updateView, { disposeWhenNodeIsRemoved: element });
     }
 };
-ko.expressionRewriting.twoWayBindings['textInput'] = true;
+ko.expressionRewriting.twoWayBindings.add('textInput');
 
 // textinput is an alias for textInput
 ko.bindingHandlers['textinput'] = {

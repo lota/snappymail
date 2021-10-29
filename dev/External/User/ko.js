@@ -64,13 +64,12 @@ ko.bindingHandlers.moment = {
 };
 
 ko.bindingHandlers.emailsTags = {
-	init: (element, fValueAccessor, fAllBindingsAccessor) => {
-		const fValue = fValueAccessor(),
-			fAllBindings = fAllBindingsAccessor();
+	init: (element, fValueAccessor, fAllBindings) => {
+		const fValue = fValueAccessor();
 
 		element.addresses = new EmailAddressesComponent(element, {
 			focusCallback: value => fValue.focused && fValue.focused(!!value),
-			autoCompleteSource: fAllBindings.autoCompleteSource || null,
+			autoCompleteSource: fAllBindings.get('autoCompleteSource'),
 			onChange: value => fValue(value)
 		});
 
@@ -220,7 +219,7 @@ ko.bindingHandlers.initDom = {
 };
 
 ko.bindingHandlers.onEsc = {
-	init: (element, fValueAccessor, fAllBindingsAccessor, viewModel) => {
+	init: (element, fValueAccessor, fAllBindings, viewModel) => {
 		let fn = event => {
 			if ('Escape' == event.key) {
 				element.dispatchEvent(new Event('change'));
@@ -235,7 +234,7 @@ ko.bindingHandlers.onEsc = {
 ko.bindingHandlers.registerBootstrapDropdown = {
 	init: element => {
 		rl.Dropdowns.register(element);
-		element.ddBtn = new BSN.Dropdown(element.querySelector('[data-toggle="dropdown"]'));
+		element.ddBtn = new BSN.Dropdown(element.querySelector('.dropdown-toggle'));
 	}
 };
 
@@ -250,10 +249,4 @@ ko.bindingHandlers.openDropdownTrigger = {
 			fValueAccessor()(false);
 		}
 	}
-};
-
-ko.bindingHandlers.dropdownCloser = {
-	init: element => element.closest('.dropdown').addEventListener('click', event =>
-		event.target.closestWithin('.e-item', element) && element.ddBtn.toggle()
-	)
 };

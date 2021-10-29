@@ -1,4 +1,4 @@
-import { isArray, isNonEmptyArray, pString, pInt } from 'Common/Utils';
+import { isArray, arrayLength, pString, pInt } from 'Common/Utils';
 
 import {
 	getFolderHash,
@@ -50,20 +50,10 @@ class RemoteUserFetch extends AbstractFetchRemote {
 
 	/**
 	 * @param {?Function} fCallback
-	 * @param {string} sEmail
-	 * @param {string} sLogin
-	 * @param {string} sPassword
-	 * @param {boolean} bSignMe
-	 * @param {string=} sLanguage
+	 * @param {FormData} oData
 	 */
-	login(fCallback, sEmail, sPassword, bSignMe, sLanguage) {
-		this.defaultRequest(fCallback, 'Login', {
-			Email: sEmail,
-			Login: '',
-			Password: sPassword,
-			Language: sLanguage || '',
-			SignMe: bSignMe ? 1 : 0
-		});
+	login(fCallback, oData) {
+		this.defaultRequest(fCallback, 'Login', oData);
 	}
 
 	/**
@@ -196,47 +186,6 @@ class RemoteUserFetch extends AbstractFetchRemote {
 	}
 
 	/**
-	 * @param {?Function} fCallback
-	 */
-	templates(fCallback) {
-		this.defaultRequest(fCallback, 'Templates', {});
-	}
-
-	/**
-	 * @param {Function} fCallback
-	 * @param {string} sID
-	 */
-	templateGetById(fCallback, sID) {
-		this.defaultRequest(fCallback, 'TemplateGetByID', {
-			ID: sID
-		});
-	}
-
-	/**
-	 * @param {Function} fCallback
-	 * @param {string} sID
-	 */
-	templateDelete(fCallback, sID) {
-		this.defaultRequest(fCallback, 'TemplateDelete', {
-			IdToDelete: sID
-		});
-	}
-
-	/**
-	 * @param {Function} fCallback
-	 * @param {string} sID
-	 * @param {string} sName
-	 * @param {string} sBody
-	 */
-	templateSetup(fCallback, sID, sName, sBody) {
-		this.defaultRequest(fCallback, 'TemplateSetup', {
-			ID: sID,
-			Name: sName,
-			Body: sBody
-		});
-	}
-
-	/**
 	 * @param {Function} fCallback
 	 * @param {object} params
 	 * @param {boolean=} bSilent = false
@@ -249,7 +198,7 @@ class RemoteUserFetch extends AbstractFetchRemote {
 			inboxUidNext = getFolderInboxName() === sFolderFullNameRaw ? getFolderUidNext(sFolderFullNameRaw) : '';
 
 		params.Folder = sFolderFullNameRaw;
-		params.ThreadUid = useThreads ? params.ThreadUid : '';
+		params.ThreadUid = useThreads ? params.ThreadUid : 0;
 		params = Object.assign({
 			Folder: '',
 			Offset: 0,
@@ -257,7 +206,7 @@ class RemoteUserFetch extends AbstractFetchRemote {
 			Search: '',
 			UidNext: inboxUidNext,
 			UseThreads: useThreads,
-			ThreadUid: '',
+			ThreadUid: 0,
 			Sort: FolderUserStore.sortMode()
 		}, params);
 
@@ -371,7 +320,7 @@ class RemoteUserFetch extends AbstractFetchRemote {
 		let request = true;
 		const uids = [];
 
-		if (isNonEmptyArray(list)) {
+		if (arrayLength(list)) {
 			request = false;
 			list.forEach(messageListItem => {
 				if (!MessageFlagsCache.getFor(messageListItem.folder, messageListItem.uid)) {
@@ -395,8 +344,8 @@ class RemoteUserFetch extends AbstractFetchRemote {
 		if (request) {
 			this.defaultRequest(fCallback, 'FolderInformation', {
 				Folder: folder,
-				FlagsUids: isArray(uids) ? uids.join(',') : '',
-				UidNext: getFolderInboxName() === folder ? getFolderUidNext(folder) : ''
+				FlagsUids: isArray(uids) ? uids : [],
+				UidNext: getFolderInboxName() === folder ? getFolderUidNext(folder) : 0
 			});
 		} else if (SettingsUserStore.useThreads()) {
 			rl.app.reloadFlagsCurrentMessageListAndMessageFromCache();
@@ -473,15 +422,15 @@ class RemoteUserFetch extends AbstractFetchRemote {
 	/**
 	 * @param {?Function} fCallback
 	 * @param {string} sMessageFolder
-	 * @param {string} sMessageUid
+	 * @param {number} iMessageUid
 	 * @param {string} sReadReceipt
 	 * @param {string} sSubject
 	 * @param {string} sText
 	 */
-	sendReadReceiptMessage(fCallback, sMessageFolder, sMessageUid, sReadReceipt, sSubject, sText) {
+	sendReadReceiptMessage(fCallback, sMessageFolder, iMessageUid, sReadReceipt, sSubject, sText) {
 		this.defaultRequest(fCallback, 'SendReadReceiptMessage', {
 			MessageFolder: sMessageFolder,
-			MessageUid: sMessageUid,
+			MessageUid: iMessageUid,
 			ReadReceipt: sReadReceipt,
 			Subject: sSubject,
 			Text: sText
@@ -542,6 +491,19 @@ class RemoteUserFetch extends AbstractFetchRemote {
 		this.defaultRequest(fCallback, 'FolderSubscribe', {
 			Folder: sFolderFullNameRaw,
 			Subscribe: bSubscribe ? 1 : 0
+		});
+	}
+
+	/**
+	 * @param {?Function} fCallback
+	 * @param {string} sFolderFullNameRaw
+	 * @param {boolean} bSubscribe
+	 */
+	folderSetMetadata(fCallback, sFolderFullNameRaw, sKey, sValue) {
+		this.defaultRequest(fCallback, 'FolderSetMetadata', {
+			Folder: sFolderFullNameRaw,
+			Key: sKey,
+			Value: sValue
 		});
 	}
 

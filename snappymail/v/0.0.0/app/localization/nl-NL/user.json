@@ -97,7 +97,7 @@
 		"MENU_SELECT_UNFLAGGED": "Zonder Vlag",
 		"EMPTY_LIST": "Geen berichten",
 		"EMPTY_SEARCH_LIST": "Geen items gevonden",
-		"SEARCH_RESULT_FOR": "Zoekresultaten voor\"%SEARCH%\"",
+		"SEARCH_RESULT_FOR": "Zoekresultaten voor \"%SEARCH%\"",
 		"BACK_TO_MESSAGE_LIST": "terug naar berichtenlijst",
 		"EMPTY_SUBJECT_TEXT": "(Geen onderwerp)",
 		"PUT_MESSAGE_HERE": "Sleep bericht hier om ze te bekijken in de lijst",
@@ -145,7 +145,8 @@
 		"PGP_SIGNED_MESSAGE_DESC": "OpenPGP ondertekend bericht (klik om te verifiëren)",
 		"PGP_ENCRYPTED_MESSAGE_DESC": "OpenPGP versleuteld bericht (klik om te ontsleutelen)",
 		"LINK_DOWNLOAD_AS_ZIP": "Download als zip",
-		"SPAM_SCORE": "Spamscore"
+		"SPAM_SCORE": "Spamscore",
+		"HAS_VIRUS_WARNING": "WAARSCHUWING: virus gedetecteerd"
 	},
 	"READ_RECEIPT": {
 		"SUBJECT": "Ontvangstbevestiging (weergegeven) - %SUBJECT%",
@@ -354,7 +355,6 @@
 		"LABEL_ACCOUNTS_NAME": "Accounts",
 		"LABEL_IDENTITIES_NAME": "Identiteiten",
 		"LABEL_FILTERS_NAME": "Filters",
-		"LABEL_TEMPLATES_NAME": "Templates",
 		"LABEL_SECURITY_NAME": "Beveiliging",
 		"LABEL_THEMES_NAME": "Thema's"
 	},
@@ -396,6 +396,8 @@
 		"LABEL_SHOW_IMAGES": "Afbeeldingen altijd weergeven in het bericht",
 		"LABEL_REMOVE_COLORS": "Verwijder achtergrond- en tekstkleuren uit het bericht",
 		"LABEL_MESSAGE_PER_PAGE": "Berichten op pagina",
+		"LABEL_MARK_MESSAGE_READ_AFTER": "Bericht markeren als gelezen na",
+		"SECONDS": "seconden",
 		"LABEL_NOTIFICATIONS": "Notificaties",
 		"LABEL_SOUND_NOTIFICATION": "Notificatie geluid",
 		"LABEL_CHROME_NOTIFICATION_DESC": "Toon nieuwe berichten popup",
@@ -432,11 +434,18 @@
 		"DELETING_PROCESS": "Map aan het wissen",
 		"RENAMING_PROCESS": "Map hernoemen",
 		"TO_MANY_FOLDERS_DESC_1": "U heeft te veel mappen!",
-		"TO_MANY_FOLDERS_DESC_2": "Er worden er maar een deel weergegeven om prestatieproblemen te voorkomen.",
+		"TO_MANY_FOLDERS_DESC_2": "Er wordt maar een deel weergegeven om prestatieproblemen te voorkomen.",
 		"HELP_DELETE_FOLDER": "Verwijder map",
 		"HELP_SHOW_HIDE_FOLDER": "Toon\/verberg map",
 		"HELP_CHECK_FOR_NEW_MESSAGES": "Controleer wel of niet op nieuwe berichten",
-		"HIDE_UNSUBSCRIBED": "Verberg niet geabonneerde mappen"
+		"HIDE_UNSUBSCRIBED": "Verberg niet geabonneerde mappen",
+		"TYPE_CALENDAR": "Kalender",
+		"TYPE_CONFIGURATION": "Configuratie",
+		"TYPE_CONTACTS": "Contacten",
+		"TYPE_FILES": "Bestanden",
+		"TYPE_JOURNAL": "Journaal",
+		"TYPE_NOTES": "Opmerkingen",
+		"TYPE_TASKS": "Taken"
 	},
 	"SETTINGS_ACCOUNTS": {
 		"LEGEND_ACCOUNTS": "Account Lijst",

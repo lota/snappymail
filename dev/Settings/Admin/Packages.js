@@ -9,24 +9,21 @@ import Remote from 'Remote/Admin/Fetch';
 import { showScreenPopup } from 'Knoin/Knoin';
 import { PluginPopupView } from 'View/Popup/Plugin';
 import { SettingsGet } from 'Common/Globals';
+import { addComputablesTo } from 'Common/Utils';
 
-export class PackagesAdminSettings {
+export class PackagesAdminSettings /*extends AbstractViewSettings*/ {
 	constructor() {
 		this.packagesError = ko.observable('');
 
 		this.packages = PackageAdminStore;
 
-		this.packagesCurrent = ko.computed(() =>
-			PackageAdminStore.filter(item => item && item.installed && !item.canBeUpdated)
-		);
-		this.packagesAvailableForUpdate = ko.computed(() =>
-			PackageAdminStore.filter(item => item && item.installed && !!item.canBeUpdated)
-		);
-		this.packagesAvailableForInstallation = ko.computed(() =>
-			PackageAdminStore.filter(item => item && !item.installed)
-		);
+		addComputablesTo(this, {
+			packagesCurrent: () => PackageAdminStore.filter(item => item && item.installed && !item.canBeUpdated),
+			packagesAvailableForUpdate: () => PackageAdminStore.filter(item => item && item.installed && !!item.canBeUpdated),
+			packagesAvailableForInstallation: () => PackageAdminStore.filter(item => item && !item.installed),
 
-		this.visibility = ko.computed(() => (PackageAdminStore.loading() ? 'visible' : 'hidden'));
+			visibility: () => (PackageAdminStore.loading() ? 'visible' : 'hidden')
+		});
 
 		this.enabledPlugins = ko.observable(!!SettingsGet('EnabledPlugins'));
 		this.enabledPlugins.subscribe(value =>
@@ -47,7 +44,7 @@ export class PackagesAdminSettings {
 			// configurePlugin
 			let el = event.target.closestWithin('.package-configure', oDom),
 				data = el ? ko.dataFor(el) : 0;
-			data && Remote.plugin((iError, data) => iError || showScreenPopup(PluginPopupView, [data.Result]), data.name)
+			data && Remote.plugin((iError, data) => iError || showScreenPopup(PluginPopupView, [data.Result]), data.id)
 			// disablePlugin
 			el = event.target.closestWithin('.package-active', oDom);
 			data = el ? ko.dataFor(el) : 0;
@@ -57,13 +54,6 @@ export class PackagesAdminSettings {
 
 	requestHelper(packageToRequest, install) {
 		return (iError, data) => {
-			if (iError) {
-				this.packagesError(
-					getNotification(install ? Notification.CantInstallPackage : Notification.CantDeletePackage)
-//					':\n' + getNotification(iError);
-				);
-			}
-
 			PackageAdminStore.forEach(item => {
 				if (item && packageToRequest && item.loading && item.loading() && packageToRequest.file === item.file) {
 					packageToRequest.loading(false);
@@ -71,7 +61,12 @@ export class PackagesAdminSettings {
 				}
 			});
 
-			if (!iError && data.Result.Reload) {
+			if (iError) {
+				this.packagesError(
+					getNotification(install ? Notification.CantInstallPackage : Notification.CantDeletePackage)
+					+ (data.ErrorMessage ? ':\n' + data.ErrorMessage : '')
+				);
+			} else if (data.Result.Reload) {
 				location.reload();
 			} else {
 				PackageAdminStore.fetch();
@@ -94,10 +89,11 @@ export class PackagesAdminSettings {
 	}
 
 	disablePlugin(plugin) {
-		let b = !plugin.enabled();
-		plugin.enabled(b);
+		let b = plugin.enabled();
+		plugin.enabled(!b);
 		Remote.pluginDisable((iError, data) => {
 			if (iError) {
+				plugin.enabled(b);
 				this.packagesError(
 					(Notification.UnsupportedPluginPackage === iError && data && data.ErrorMessage)
 					? data.ErrorMessage
@@ -105,7 +101,7 @@ export class PackagesAdminSettings {
 				);
 			}
 //			PackageAdminStore.fetch();
-		}, plugin.name, !b);
+		}, plugin.id, b);
 	}
 
 }

@@ -21,9 +21,9 @@ trait Messages
 		$iOffset = 0;
 		$iLimit = 20;
 		$sSearch = '';
-		$sUidNext = '';
+		$iUidNext = 0;
 		$bUseThreads = false;
-		$sThreadUid = '';
+		$iThreadUid = 0;
 		$sSort = '';
 
 		$sRawKey = $this->GetActionParam('RawKey', '');
@@ -35,12 +35,12 @@ trait Messages
 			$iOffset = (int) $aValues[3];
 			$iLimit = (int) $aValues[4];
 			$sSearch = (string) $aValues[5];
-			$sUidNext = (string) $aValues[6];
+			$iUidNext = (int) $aValues[6];
 			$bUseThreads = (bool) $aValues[7];
 
 			if ($bUseThreads)
 			{
-				$sThreadUid = isset($aValues[8]) ? (string) $aValues[8] : '';
+				$iThreadUid = isset($aValues[8]) ? (int) $aValues[8] : 0;
 			}
 
 			$sSort = isset($aValues[9]) ? (string) $aValues[9] : '';
@@ -54,12 +54,12 @@ trait Messages
 			$iLimit = (int) $this->GetActionParam('Limit', 10);
 			$sSearch = $this->GetActionParam('Search', '');
 			$sSort = $this->GetActionParam('Sort', '');
-			$sUidNext = $this->GetActionParam('UidNext', '');
+			$iUidNext = (int) $this->GetActionParam('UidNext', 0);
 			$bUseThreads = !empty($this->GetActionParam('UseThreads', '0'));
 
 			if ($bUseThreads)
 			{
-				$sThreadUid = (string) $this->GetActionParam('ThreadUid', '');
+				$iThreadUid = (int) $this->GetActionParam('ThreadUid', '');
 			}
 		}
 
@@ -78,11 +78,11 @@ trait Messages
 			}
 
 			$oMessageList = $this->MailClient()->MessageList(
-				$sFolder, $iOffset, $iLimit, $sSearch, $sUidNext,
+				$sFolder, $iOffset, $iLimit, $sSearch, $iUidNext,
 				$this->cacherForUids(),
 				!!$this->Config()->Get('labs', 'use_imap_sort', true),
 				$bUseThreads,
-				$sThreadUid,
+				$iThreadUid,
 				'',
 				$sSort
 			);
@@ -104,13 +104,8 @@ trait Messages
 	{
 		$oAccount = $this->initMailClientConnection();
 
-		if (!$this->GetCapa(false, Capa::COMPOSER, $oAccount))
-		{
-			return $this->FalseResponse(__FUNCTION__);
-		}
-
 		$sMessageFolder = $this->GetActionParam('MessageFolder', '');
-		$sMessageUid = $this->GetActionParam('MessageUid', '');
+		$iMessageUid = $this->GetActionParam('MessageUid', 0);
 
 		$sDraftFolder = $this->GetActionParam('SaveFolder', '');
 		if (0 === strlen($sDraftFolder))
@@ -149,9 +144,9 @@ trait Messages
 
 				$mResult = true;
 
-				if (0 < strlen($sMessageFolder) && 0 < strlen($sMessageUid))
+				if (0 < strlen($sMessageFolder) && 0 < $iMessageUid)
 				{
-					$this->MailClient()->MessageDelete($sMessageFolder, array($sMessageUid), true, true);
+					$this->MailClient()->MessageDelete($sMessageFolder, array($iMessageUid), true, true);
 				}
 
 				if (null !== $iNewUid && 0 < $iNewUid)
@@ -171,15 +166,10 @@ trait Messages
 	{
 		$oAccount = $this->initMailClientConnection();
 
-		if (!$this->GetCapa(false, Capa::COMPOSER, $oAccount))
-		{
-			return $this->FalseResponse(__FUNCTION__);
-		}
-
 		$oConfig = $this->Config();
 
 		$sDraftFolder = $this->GetActionParam('MessageFolder', '');
-		$sDraftUid = $this->GetActionParam('MessageUid', '');
+		$iDraftUid = $this->GetActionParam('MessageUid', 0);
 		$sSentFolder = $this->GetActionParam('SaveFolder', '');
 		$aDraftInfo = $this->GetActionParam('DraftInfo', null);
 		$bDsn = '1' === (string) $this->GetActionParam('Dsn', '0');
@@ -287,11 +277,11 @@ trait Messages
 
 					$this->deleteMessageAttachmnets($oAccount);
 
-					if (0 < \strlen($sDraftFolder) && 0 < \strlen($sDraftUid))
+					if (0 < \strlen($sDraftFolder) && 0 < $iDraftUid)
 					{
 						try
 						{
-							$this->MailClient()->MessageDelete($sDraftFolder, array($sDraftUid), true, true);
+							$this->MailClient()->MessageDelete($sDraftFolder, array($iDraftUid), true, true);
 						}
 						catch (\Throwable $oException)
 						{
@@ -354,11 +344,6 @@ trait Messages
 	{
 		$oAccount = $this->initMailClientConnection();
 
-		if (!$this->GetCapa(false, Capa::COMPOSER, $oAccount))
-		{
-			return $this->FalseResponse(__FUNCTION__);
-		}
-
 		$oMessage = $this->buildReadReceiptMessage($oAccount);
 
 		$this->Plugins()->RunHook('filter.send-read-receipt-message', array($oMessage, $oAccount));
@@ -388,15 +373,15 @@ trait Messages
 					if (!empty($sReadReceiptFlag))
 					{
 						$sFolderFullName = $this->GetActionParam('MessageFolder', '');
-						$sUid = $this->GetActionParam('MessageUid', '');
+						$iUid = (int) $this->GetActionParam('MessageUid', 0);
 
-						$this->Cacher($oAccount)->Set(\RainLoop\KeyPathHelper::ReadReceiptCache($oAccount->Email(), $sFolderFullName, $sUid), '1');
+						$this->Cacher($oAccount)->Set(\RainLoop\KeyPathHelper::ReadReceiptCache($oAccount->Email(), $sFolderFullName, $iUid), '1');
 
-						if (0 < \strlen($sFolderFullName) && 0 < \strlen($sUid))
+						if (0 < \strlen($sFolderFullName) && 0 < $iUid)
 						{
 							try
 							{
-								$this->MailClient()->MessageSetFlag($sFolderFullName, array($sUid), true, $sReadReceiptFlag, true, true);
+								$this->MailClient()->MessageSetFlag($sFolderFullName, array($iUid), true, $sReadReceiptFlag, true, true);
 							}
 							catch (\Throwable $oException) {}
 						}
@@ -659,8 +644,8 @@ trait Messages
 					if ($aValues = \RainLoop\Utils::DecodeKeyValuesQ($sAttachment))
 					{
 						$sFolder = isset($aValues['Folder']) ? $aValues['Folder'] : '';
-						$iUid = (int) isset($aValues['Uid']) ? $aValues['Uid'] : 0;
-						$sMimeIndex = (string) isset($aValues['MimeIndex']) ? $aValues['MimeIndex'] : '';
+						$iUid = isset($aValues['Uid']) ? (int) $aValues['Uid'] : 0;
+						$sMimeIndex = isset($aValues['MimeIndex']) ? (string) $aValues['MimeIndex'] : '';
 
 						$sTempName = \md5($sAttachment);
 						if (!$this->FilesProvider()->FileExists($oAccount, $sTempName))
@@ -730,8 +715,8 @@ trait Messages
 				$oSmtpClient->SetLogger($this->Logger());
 				$oSmtpClient->SetTimeOuts(10, (int) \RainLoop\Api::Config()->Get('labs', 'smtp_timeout', 60));
 
-				$bLoggined = $oAccount->OutConnectAndLoginHelper(
-					$this->Plugins(), $oSmtpClient, $this->Config(), null, $bUsePhpMail
+				$oAccount->OutConnectAndLoginHelper(
+					$this->Plugins(), $oSmtpClient, $this->Config(), $bUsePhpMail
 				);
 
 				if ($bUsePhpMail)
@@ -808,11 +793,6 @@ trait Messages
 					}
 
 					$oSmtpClient->DataWithStream($rMessageStream);
-
-					if ($bLoggined)
-					{
-						$oSmtpClient->Logout();
-					}
 
 					$oSmtpClient->Disconnect();
 				}
@@ -1029,7 +1009,9 @@ trait Messages
 
 		if ($bReadReceiptRequest)
 		{
-			$oMessage->SetReadReceipt($oAccount->Email());
+			// Read Receipts Reference Main Account Email, Not Identities #147
+//			$oMessage->SetReadReceipt(($oFromIdentity ?: $oAccount)->Email());
+			$oMessage->SetReadReceipt($oFrom->GetEmail());
 		}
 
 		if ($bMarkAsImportant)

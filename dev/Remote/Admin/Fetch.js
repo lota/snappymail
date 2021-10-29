@@ -6,10 +6,11 @@ class RemoteAdminFetch extends AbstractFetchRemote {
 	 * @param {string} sLogin
 	 * @param {string} sPassword
 	 */
-	adminLogin(fCallback, sLogin, sPassword) {
+	adminLogin(fCallback, sLogin, sPassword, sCode) {
 		this.defaultRequest(fCallback, 'AdminLogin', {
 			Login: sLogin,
-			Password: sPassword
+			Password: sPassword,
+			TOTP: sCode
 		});
 	}
 
@@ -84,11 +85,11 @@ class RemoteAdminFetch extends AbstractFetchRemote {
 
 	/**
 	 * @param {?Function} fCallback
-	 * @param {string} sName
+	 * @param {string} sId
 	 */
-	plugin(fCallback, sName) {
+	plugin(fCallback, sId) {
 		this.defaultRequest(fCallback, 'AdminPluginLoad', {
-			Name: sName
+			Id: sId
 		});
 	}
 
@@ -124,12 +125,12 @@ class RemoteAdminFetch extends AbstractFetchRemote {
 
 	/**
 	 * @param {?Function} fCallback
-	 * @param {string} sName
+	 * @param {string} sId
 	 * @param {boolean} bDisabled
 	 */
-	pluginDisable(fCallback, sName, bDisabled) {
+	pluginDisable(fCallback, sId, bDisabled) {
 		this.defaultRequest(fCallback, 'AdminPluginDisable', {
-			Name: sName,
+			Id: sId,
 			Disabled: bDisabled ? 1 : 0
 		});
 	}
@@ -202,6 +203,12 @@ class RemoteAdminFetch extends AbstractFetchRemote {
 		this.defaultRequest(fCallback, 'AdminPasswordUpdate', oData);
 	}
 
+	/**
+	 * @param {?Function} fCallback
+	 */
+	phpExtensions(fCallback) {
+		this.defaultRequest(fCallback, 'AdminPHPExtensions');
+	}
 }
 
 export default new RemoteAdminFetch();

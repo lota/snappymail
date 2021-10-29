@@ -7,7 +7,8 @@ import {
 	changeTheme,
 	convertThemeName,
 	addObservablesTo,
-	addSubscribablesTo
+	addSubscribablesTo,
+	addComputablesTo
 } from 'Common/Utils';
 
 import { Capa, SaveSettingsStep } from 'Common/Enums';
@@ -22,7 +23,7 @@ import { ThemeStore } from 'Stores/Theme';
 import { LanguageStore } from 'Stores/Language';
 import LanguagesPopupView from 'View/Popup/Languages';
 
-export class GeneralAdminSettings {
+export class GeneralAdminSettings /*extends AbstractViewSettings*/ {
 	constructor() {
 		this.language = LanguageStore.language;
 		this.languages = LanguageStore.languages;
@@ -47,7 +48,6 @@ export class GeneralAdminSettings {
 			capaAdditionalAccounts: Settings.capa(Capa.AdditionalAccounts),
 			capaIdentities: Settings.capa(Capa.Identities),
 			capaAttachmentThumbnails: Settings.capa(Capa.AttachmentThumbnails),
-			capaTemplates: Settings.capa(Capa.Templates),
 			dataFolderAccess: false
 		});
 
@@ -74,12 +74,12 @@ export class GeneralAdminSettings {
 				  ].join('')
 				: '';
 
-		this.themesOptions = ko.computed(() =>
-			this.themes.map(theme => ({ optValue: theme, optText: convertThemeName(theme) }))
-		);
+		addComputablesTo(this, {
+			themesOptions: () => this.themes.map(theme => ({ optValue: theme, optText: convertThemeName(theme) })),
 
-		this.languageFullName = ko.computed(() => convertLangName(this.language()));
-		this.languageAdminFullName = ko.computed(() => convertLangName(this.languageAdmin()));
+			languageFullName: () => convertLangName(this.language()),
+			languageAdminFullName: () => convertLangName(this.languageAdmin())
+		});
 
 		this.languageAdminTrigger = ko.observable(SaveSettingsStep.Idle).extend({ debounce: 100 });
 
@@ -124,8 +124,6 @@ export class GeneralAdminSettings {
 			capaAdditionalAccounts: fSaveBoolHelper('CapaAdditionalAccounts'),
 
 			capaIdentities: fSaveBoolHelper('CapaIdentities'),
-
-			capaTemplates: fSaveBoolHelper('CapaTemplates'),
 
 			capaAttachmentThumbnails: fSaveBoolHelper('CapaAttachmentThumbnails'),
 

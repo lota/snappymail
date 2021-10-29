@@ -2,7 +2,7 @@
 <?php
 chdir(__DIR__);
 
-$options = getopt('', ['aur','docker','plugins']);
+$options = getopt('', ['aur','docker','plugins','set-version']);
 
 if (isset($options['plugins'])) {
 	$destPath = "build/dist/releases/plugins/";
@@ -85,9 +85,29 @@ if (!$gulp) {
 	exit('gulp not installed, run as root: npm install --global gulp-cli');
 }
 
-$rollup = trim(`which rollup`);
-if (!$rollup) {
-	exit('rollup not installed, run as root: npm install --global rollup');
+$package = json_decode(file_get_contents('package.json'));
+
+/**
+ * Update files that contain version
+ */
+// cloudron
+$file = __DIR__ . '/integrations/cloudron/Dockerfile';
+file_put_contents($file, preg_replace('/VERSION=[0-9.]+/', "VERSION={$package->version}", file_get_contents($file)));
+$file = __DIR__ . '/integrations/cloudron/DESCRIPTION.md';
+file_put_contents($file, preg_replace('/<upstream>[^<]*</', "<upstream>{$package->version}<", file_get_contents($file)));
+// docker
+$file = __DIR__ . '/.docker/release/files/usr/local/include/application.ini';
+file_put_contents($file, preg_replace('/current = "[0-9.]+"/', "current = \"{$package->version}\"", file_get_contents($file)));
+// nextcloud
+file_put_contents(__DIR__ . '/integrations/nextcloud/snappymail/VERSION', $package->version);
+$file = __DIR__ . '/integrations/nextcloud/snappymail/appinfo/info.xml';
+file_put_contents($file, preg_replace('/<version>[^<]*</', "<version>{$package->version}<", file_get_contents($file)));
+// virtualmin
+$file = __DIR__ . '/integrations/virtualmin/snappymail.pl';
+file_put_contents($file, preg_replace('/return \\( "[0-9]+\\.[0-9]+\\.[0-9]+" \\)/', "return ( \"{$package->version}\" )", file_get_contents($file)));
+
+if (isset($options['set-version'])) {
+	exit;
 }
 
 // Arch User Repository
@@ -97,8 +117,6 @@ $options['aur'] = isset($options['aur']);
 // Docker build
 $docker = trim(`which docker`);
 $options['docker'] = isset($options['docker']) || (!$options['aur'] && $docker && strtoupper(readline("Build Docker image? (Y/N): ")) === "Y");
-
-$package = json_decode(file_get_contents('package.json'));
 
 $destPath = "build/dist/releases/webmail/{$package->version}/";
 is_dir($destPath) || mkdir($destPath, 0777, true);
@@ -115,13 +133,6 @@ passthru($gulp, $return_var);
 if ($return_var) {
 	exit("gulp failed with error code {$return_var}\n");
 }
-
-/*
-passthru("{$rollup} -c", $return_var);
-if ($return_var) {
-	exit("rollup failed with error code {$return_var}\n");
-}
-*/
 
 $cmddir = escapeshellcmd(__DIR__) . '/snappymail/v/0.0.0/static';
 
@@ -240,7 +251,22 @@ echo "{$zip_destination} created\n{$tar_destination}.gz created\n";
 
 // Arch User Repository
 if ($options['aur']) {
-/*
+	// extension_loaded('blake2')
+	if (!function_exists('b2sum') && $b2sum = trim(`which b2sum`)) {
+		function b2sum($file) {
+			$file = escapeshellarg($file);
+			exec("b2sum --binary {$file} 2>&1", $output, $exitcode);
+			$output = explode(' ', implode("\n", $output));
+			return $output[0];
+		}
+	}
+
+	$b2sums = function_exists('b2sum') ? [
+		b2sum("{$tar_destination}.gz"),
+		b2sum(__DIR__ . '/arch/snappymail.sysusers'),
+		b2sum(__DIR__ . '/arch/snappymail.tmpfiles')
+	] : [];
+
 	file_put_contents('arch/.SRCINFO', 'pkgbase = snappymail
 	pkgdesc = modern PHP webmail client
 	pkgver = '.$package->version.'
@@ -259,13 +285,18 @@ if ($options['aur']) {
 	source = snappymail-'.$package->version.'.tar.gz::https://github.com/the-djmaze/snappymail/archive/v'.$package->version.'.tar.gz
 	source = snappymail.sysusers
 	source = snappymail.tmpfiles
-	b2sums = ?
-	b2sums = e020b2d4bc694ca056f5c15b148c69553ab610b5e1789f52543aa65e098f8097a41709b5b0fc22a6a01088a9d3f14d623b1b6e9ae2570acd4f380f429301c003
-	b2sums = 2536e11622895322cc752c6b651811b2122d3ae60099fe609609d7b45ba1ed00ea729c23f344405078698d161dbf9bcaffabf8eff14b740acdce3c681c513318
+	b2sums = '.implode("\n	b2sums = ", $b2sums).'
 
 pkgname = snappymail
 ');
-*/
+
+	$file = __DIR__ . '/arch/PKGBUILD';
+	if (is_file($file)) {
+		$PKGBUILD = file_get_contents($file);
+		$PKGBUILD = preg_replace('/pkgver=[0-9.]+/', "pkgver={$package->version}", $PKGBUILD);
+		$PKGBUILD = preg_replace('/b2sums=\\([^)]+\\)/s', "b2sums=('".implode("'\n        '", $b2sums)."')", $PKGBUILD);
+		file_put_contents($file, $PKGBUILD);
+	}
 }
 // Docker build
 else if ($options['docker']) {

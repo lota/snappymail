@@ -135,6 +135,7 @@ class Application extends \RainLoop\Config\AbstractConfig
 				'allow_additional_identities' => array(true, ''),
 
 				'messages_per_page'           => array(20, 'Number of messages displayed on page by default'),
+				'message_read_delay'          => array(5, 'Mark message read after N seconds'),
 
 				'attachment_size_limit'       => array(\min($upload_max_filesize, 25), 'File size limit (MB) for file upload on compose screen
 0 for unlimited.')
@@ -168,6 +169,7 @@ class Application extends \RainLoop\Config\AbstractConfig
 
 				'admin_login'                => array('admin', 'Login and password for web admin panel'),
 				'admin_password'             => array(''),
+				'admin_totp'                 => array(''),
 				'allow_admin_panel'          => array(true, 'Access settings'),
 				'hide_x_mailer_header'       => array(true),
 				'admin_panel_host'           => array(''),
@@ -184,18 +186,12 @@ class Application extends \RainLoop\Config\AbstractConfig
 			),
 
 			'capa' => array(
-				'composer' => array(true),
 				'contacts' => array(true),
-				'settings' => array(true),
 				'quota' => array(true),
-				'help' => array(true),
-				'reload' => array(true),
 				'search' => array(true),
 				'search_adv' => array(true),
-				'x-templates' => array(false),
 				'dangerous_actions' => array(true),
 				'message_actions' => array(true),
-				'messagelist_actions' => array(true),
 				'attachments_actions' => array(true)
 			),
 
@@ -300,7 +296,7 @@ Enables caching in the system'),
 
 				'index' => array('v1', 'Additional caching key. If changed, cache is purged'),
 
-				'fast_cache_driver' => array('files', 'Can be: files, APC, memcache, redis (beta)'),
+				'fast_cache_driver' => array('files', 'Can be: files, APCU, memcache, redis (beta)'),
 				'fast_cache_index' => array('v1', 'Additional caching key. If changed, fast cache is purged'),
 
 				'http' => array(true, 'Browser-level cache. If enabled, caching is maintainted without using files'),
@@ -310,17 +306,13 @@ Enables caching in the system'),
 			),
 
 			'labs' => array(
-//				'ignore_folders_subscription' => array(false),
-				'update_channel' => array('stable'),
 				'allow_prefetch' => array(true),
-				'allow_smart_html_links' => array(true),
 				'cache_system_data' => array(true),
 				'date_from_headers' => array(true),
 				'autocreate_system_folders' => array(true),
 				'allow_message_append' => array(false),
 				'login_fault_delay' => array(1),
 				'log_ajax_response_write_limit' => array(300),
-				'allow_html_editor_source_button' => array(false),
 				'allow_html_editor_biti_buttons' => array(false),
 				'allow_ctrl_enter_on_compose' => array(true),
 				'try_to_detect_hidden_images' => array(false),
@@ -346,6 +338,7 @@ Enables caching in the system'),
 				'imap_show_login_alert' => array(true),
 				'imap_use_auth_plain' => array(true),
 				'imap_use_auth_cram_md5' => array(false),
+				'imap_use_list_status' => array(true),
 				'smtp_show_server_errors' => array(false),
 				'smtp_use_auth_plain' => array(true),
 				'smtp_use_auth_cram_md5' => array(false),
@@ -378,6 +371,7 @@ Enables caching in the system'),
 				'startup_url' => array(''),
 				'strict_html_parser' => array(false),
 				'boundary_prefix' => array(''),
+				'kolab_enabled' => array(false),
 				'dev_email' => array(''),
 				'dev_password' => array('')
 			),

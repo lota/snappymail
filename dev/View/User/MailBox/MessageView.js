@@ -14,9 +14,9 @@ import {
 	MessageSetAction
 } from 'Common/EnumsUser';
 
-import { doc, $htmlCL, leftPanelDisabled, keyScopeReal, moveAction, Settings } from 'Common/Globals';
+import { $htmlCL, leftPanelDisabled, keyScopeReal, moveAction, Settings, getFullscreenElement, exitFullscreen } from 'Common/Globals';
 
-import { isNonEmptyArray, inFocus } from 'Common/Utils';
+import { arrayLength, inFocus } from 'Common/Utils';
 import { mailToHelper, showMessageComposer } from 'Common/UtilsUser';
 
 import { SMAudio } from 'Common/Audio';
@@ -40,9 +40,9 @@ import Remote from 'Remote/User/Fetch';
 import { decorateKoCommands, createCommand } from 'Knoin/Knoin';
 import { AbstractViewRight } from 'Knoin/AbstractViews';
 
-class MessageViewMailBoxUserView extends AbstractViewRight {
+export class MailMessageView extends AbstractViewRight {
 	constructor() {
-		super('User/MailBox/MessageView', 'MailMessageView');
+		super('MailMessageView');
 
 		const
 			createCommandReplyHelper = type =>
@@ -53,9 +53,9 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 
 			createCommandActionHelper = (folderType, useFolder) =>
 				createCommand(() => {
-					const message = this.message();
-					if (message && this.allowMessageListActions) {
-						this.message(null);
+					const message = MessageUserStore.message();
+					if (message) {
+						MessageUserStore.message(null);
 						rl.app.deleteMessagesFromFolder(folderType, message.folder, [message.uid], useFolder);
 					}
 				}, this.messageVisibility);
@@ -73,20 +73,15 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 
 		this.moveAction = moveAction;
 
-		this.allowComposer = Settings.capa(Capa.Composer);
 		this.allowMessageActions = Settings.capa(Capa.MessageActions);
-		this.allowMessageListActions = Settings.capa(Capa.MessageListActions);
 
 		const attachmentsActions = Settings.app('attachmentsActions');
-		this.attachmentsActions = ko.observableArray(isNonEmptyArray(attachmentsActions) ? attachmentsActions : []);
+		this.attachmentsActions = ko.observableArray(arrayLength(attachmentsActions) ? attachmentsActions : []);
 
 		this.message = MessageUserStore.message;
 		this.hasCheckedMessages = MessageUserStore.hasCheckedMessages;
 		this.messageLoadingThrottle = MessageUserStore.messageLoading;
 		this.messagesBodiesDom = MessageUserStore.messagesBodiesDom;
-		this.useThreads = SettingsUserStore.useThreads;
-		this.replySameFolder = SettingsUserStore.replySameFolder;
-		this.layout = SettingsUserStore.layout;
 		this.isMessageSelected = MessageUserStore.isMessageSelected;
 		this.messageActiveDom = MessageUserStore.messageActiveDom;
 		this.messageError = MessageUserStore.messageError;
@@ -140,7 +135,8 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 			viewUnsubscribeLink: '',
 			viewDownloadLink: '',
 			viewIsImportant: false,
-			viewIsFlagged: false
+			viewIsFlagged: false,
+			hasVirus: null
 		});
 
 		this.addComputables({
@@ -157,7 +153,7 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 				)
 			},
 
-			messageVisibility: () => !MessageUserStore.messageLoading() && !!this.message(),
+			messageVisibility: () => !MessageUserStore.messageLoading() && !!MessageUserStore.message(),
 
 			canBeRepliedOrForwarded: () => !this.isDraftFolder() && this.messageVisibility(),
 
@@ -176,10 +172,8 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 
 			viewFromDkimStatusTitle:() => {
 				const status = this.viewFromDkimData();
-				if (isNonEmptyArray(status)) {
-					if (status[0]) {
-						return status[1] || 'DKIM: ' + status[0];
-					}
+				if (arrayLength(status) && status[0]) {
+					return status[1] || 'DKIM: ' + status[0];
 				}
 
 				return '';
@@ -192,8 +186,8 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 		});
 
 		this.addSubscribables({
-			showAttachmnetControls: v => this.message()
-				&& this.message().attachments.forEach(item => item && item.checked(!!v)),
+			showAttachmnetControls: v => MessageUserStore.message()
+				&& MessageUserStore.message().attachments.forEach(item => item && item.checked(!!v)),
 
 			lastReplyAction_: value => Local.set(ClientSideKeyName.LastReplyAction, value),
 
@@ -212,6 +206,8 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 						this.scrollMessageToTop();
 					}
 
+					let spam = message.spamResult();
+
 					this.viewFolder = message.folder;
 					this.viewUid = message.uid;
 					this.viewHash = message.hash;
@@ -227,13 +223,14 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 					this.viewTimeStamp(message.dateTimeStampInUTC());
 					this.viewSize(message.friendlySize());
 					this.viewSpamScore(message.spamScore());
-					this.viewSpamStatus(i18n(message.isSpam() ? 'GLOBAL/SPAM' : 'GLOBAL/NOT_SPAM') + ': ' + message.spamResult());
+					this.viewSpamStatus(spam ? i18n(message.isSpam() ? 'GLOBAL/SPAM' : 'GLOBAL/NOT_SPAM') + ': ' + spam : '');
 					this.viewLineAsCss(message.lineAsCss());
 					this.viewViewLink(message.viewLink());
 					this.viewUnsubscribeLink(message.getFirstUnsubsribeLink());
 					this.viewDownloadLink(message.downloadLink());
 					this.viewIsImportant(message.isImportant());
 					this.viewIsFlagged(message.isFlagged());
+					this.hasVirus(message.hasVirus());
 				} else {
 					MessageUserStore.selectorMessageSelected(null);
 
@@ -247,7 +244,7 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 
 			fullScreenMode: value => {
 				if (this.oContent) {
-					value ? this.oContent.requestFullscreen() : doc.exitFullscreen();
+					value ? this.oContent.requestFullscreen() : exitFullscreen();
 				} else {
 					$htmlCL.toggle('rl-message-fullscreen', value);
 				}
@@ -255,7 +252,7 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 		});
 
 		MessageUserStore.messageViewTrigger.subscribe(() => {
-			const message = this.message();
+			const message = MessageUserStore.message();
 			this.viewIsFlagged(message ? message.isFlagged() : false);
 		});
 
@@ -281,13 +278,13 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 
 	goUpCommand() {
 		dispatchEvent(new CustomEvent('mailbox.message-list.selector.go-up',
-			{detail:SettingsUserStore.usePreviewPane() || !!this.message()} // bForceSelect
+			{detail:SettingsUserStore.usePreviewPane() || !!MessageUserStore.message()} // bForceSelect
 		));
 	}
 
 	goDownCommand() {
 		dispatchEvent(new CustomEvent('mailbox.message-list.selector.go-down',
-			{detail:SettingsUserStore.usePreviewPane() || !!this.message()} // bForceSelect
+			{detail:SettingsUserStore.usePreviewPane() || !!MessageUserStore.message()} // bForceSelect
 		));
 	}
 
@@ -308,11 +305,14 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 	}
 
 	checkHeaderHeight() {
-		this.oHeaderDom && this.viewBodyTopValue(this.message() ? this.oHeaderDom.offsetHeight : 0);
+		this.oHeaderDom && this.viewBodyTopValue(MessageUserStore.message() ? this.oHeaderDom.offsetHeight : 0);
 	}
 
 	onBuild(dom) {
-		this.fullScreenMode.subscribe(value => value && this.message() && AppUserStore.focusedState(Scope.MessageView));
+		this.oMessageScrollerDom = dom.querySelector('.messageItem');
+
+		this.fullScreenMode.subscribe(value =>
+			value && MessageUserStore.message() && AppUserStore.focusedState(Scope.MessageView));
 
 		this.showFullInfo.subscribe(value => Local.set(ClientSideKeyName.MessageHeaderFullInfo, value ? '1' : '0'));
 
@@ -334,12 +334,9 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 			event = 'webkit'+event;
 		}
 		if (el.requestFullscreen) {
-			if (!doc.exitFullscreen && doc.webkitExitFullscreen) {
-				doc.exitFullscreen = doc.webkitExitFullscreen;
-			}
 			this.oContent = el;
 			el.addEventListener(event, () =>
-				this.fullScreenMode((doc.fullscreenElement || doc.webkitFullscreenElement) === el)
+				this.fullScreenMode(getFullscreenElement() === el)
 			);
 		}
 
@@ -386,7 +383,7 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 			}
 
 			if (eqs(event, '.messageItemHeader .subjectParent .flagParent')) {
-				const message = this.message();
+				const message = MessageUserStore.message();
 				message && rl.app.messageListAction(
 					message.folder,
 					message.isFlagged() ? MessageSetAction.UnsetFlag : MessageSetAction.SetFlag,
@@ -418,15 +415,11 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 
 		keyScopeReal.subscribe(value => this.messageDomFocused(Scope.MessageView === value && !inFocus()));
 
-		this.oMessageScrollerDom = dom.querySelector('.messageItem');
+		// initShortcuts
 
-		this.initShortcuts();
-	}
-
-	initShortcuts() {
 		// exit fullscreen, back
 		shortcuts.add('escape,backspace', '', Scope.MessageView, () => {
-			if (this.viewModelVisible && this.message()) {
+			if (!this.viewModelDom.hidden && MessageUserStore.message()) {
 				const preview = SettingsUserStore.usePreviewPane();
 				if (this.fullScreenMode()) {
 					this.fullScreenMode(false);
@@ -435,15 +428,13 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 						AppUserStore.focusedState(Scope.MessageList);
 					}
 				} else if (!preview) {
-					this.message(null);
+					MessageUserStore.message(null);
 				} else {
 					AppUserStore.focusedState(Scope.MessageList);
 				}
 
 				return false;
 			}
-
-			return true;
 		});
 
 		// fullscreen
@@ -461,20 +452,18 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 			return true;
 		});
 
-		// replaAll
+		// replyAll
 		shortcuts.add('a', '', [Scope.MessageList, Scope.MessageView], () => {
 			if (MessageUserStore.message()) {
 				this.replyAllCommand();
 				return false;
 			}
-			return true;
 		});
 		shortcuts.add('mailreply', 'shift', [Scope.MessageList, Scope.MessageView], () => {
 			if (MessageUserStore.message()) {
 				this.replyAllCommand();
 				return false;
 			}
-			return true;
 		});
 
 		// forward
@@ -483,8 +472,6 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 				this.forwardCommand();
 				return false;
 			}
-
-			return true;
 		});
 
 		// message information
@@ -502,7 +489,6 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 				message.body.querySelectorAll('.rlBlockquoteSwitcher').forEach(node => node.click());
 				return false;
 			}
-			return true;
 		});
 
 		shortcuts.add('arrowup,arrowleft', 'meta', [Scope.MessageList, Scope.MessageView], () => {
@@ -517,7 +503,7 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 
 		// print
 		shortcuts.add('p,printscreen', 'meta', [Scope.MessageView, Scope.MessageList], () => {
-			this.message() && this.message().printMessage();
+			MessageUserStore.message() && MessageUserStore.message().printMessage();
 			return false;
 		});
 
@@ -533,17 +519,14 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 
 		// change focused state
 		shortcuts.add('arrowleft', '', Scope.MessageView, () => {
-			if (!this.fullScreenMode() && this.message() && SettingsUserStore.usePreviewPane()) {
-				if (this.oMessageScrollerDom && 0 < this.oMessageScrollerDom.scrollLeft) {
-					return true;
-				}
+			if (!this.fullScreenMode() && MessageUserStore.message() && SettingsUserStore.usePreviewPane()
+			 && !this.oMessageScrollerDom.scrollLeft) {
 				AppUserStore.focusedState(Scope.MessageList);
 				return false;
 			}
 		});
-//		shortcuts.add('tab', 'shift', Scope.MessageView, (event, handler) => {
-		shortcuts.add('tab', '', Scope.MessageView, () => {
-			if (!this.fullScreenMode() && this.message() && SettingsUserStore.usePreviewPane()) {
+		shortcuts.add('tab', 'shift', Scope.MessageView, () => {
+			if (!this.fullScreenMode() && MessageUserStore.message() && SettingsUserStore.usePreviewPane()) {
 				AppUserStore.focusedState(Scope.MessageList);
 			}
 			return false;
@@ -610,37 +593,27 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 	}
 
 	scrollMessageToTop() {
-		if (this.oMessageScrollerDom) {
-			if (50 < this.oMessageScrollerDom.scrollTop) {
-				this.oMessageScrollerDom.scrollTop = 50;
-			} else {
-				this.oMessageScrollerDom.scrollTop = 0;
-			}
-		}
+		this.oMessageScrollerDom.scrollTop = (50 < this.oMessageScrollerDom.scrollTop) ? 50 : 0;
 	}
 
 	scrollMessageToLeft() {
-		if (this.oMessageScrollerDom) {
-			this.oMessageScrollerDom.scrollLeft = 0;
-		}
+		this.oMessageScrollerDom.scrollLeft = 0;
 	}
 
 	downloadAsZip() {
-		const hashes = (this.message() ? this.message().attachments : [])
+		const hashes = (MessageUserStore.message() ? MessageUserStore.message().attachments : [])
 			.map(item => (item && !item.isLinked && item.checked() ? item.download : ''))
 			.filter(v => v);
 		if (hashes.length) {
 			Remote.attachmentsActions('Zip', hashes, this.downloadAsZipLoading)
-				.then((result) => {
+				.then(result => {
 					if (result && result.Result && result.Result.FileHash) {
 						rl.app.download(attachmentDownload(result.Result.FileHash));
 					} else {
 						this.downloadAsZipError(true);
 					}
 				})
-				.catch(() => {
-					this.downloadAsZipError(true);
-				});
+				.catch(() => this.downloadAsZipError(true));
 		} else {
 			this.highlightUnselectedAttachments(true);
 		}
@@ -650,10 +623,8 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 	 * @param {MessageModel} oMessage
 	 * @returns {void}
 	 */
-	showImages(message) {
-		if (message && message.showExternalImages) {
-			message.showExternalImages();
-		}
+	showImages() {
+		MessageUserStore.message() && MessageUserStore.message().showExternalImages();
 	}
 
 	/**
@@ -668,10 +639,11 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 	 * @param {MessageModel} oMessage
 	 * @returns {void}
 	 */
-	readReceipt(oMessage) {
+	readReceipt() {
+		let oMessage = MessageUserStore.message()
 		if (oMessage && oMessage.readReceipt()) {
 			Remote.sendReadReceiptMessage(
-				()=>{},
+				()=>0,
 				oMessage.folder,
 				oMessage.uid,
 				oMessage.readReceipt(),
@@ -687,5 +659,3 @@ class MessageViewMailBoxUserView extends AbstractViewRight {
 		}
 	}
 }
-
-export { MessageViewMailBoxUserView };

@@ -145,7 +145,8 @@
 		"PGP_SIGNED_MESSAGE_DESC": "OpenPGP aláírt üzenet (kattints az ellenőrzéshez)",
 		"PGP_ENCRYPTED_MESSAGE_DESC": "OpenPGP kódolt üzenet (kattints a visszafejtéshez)",
 		"LINK_DOWNLOAD_AS_ZIP": "Letöltés zip fájlként",
-		"SPAM_SCORE": "Spam Score"
+		"SPAM_SCORE": "Spam Score",
+		"HAS_VIRUS_WARNING": "FIGYELEM: vírust észleltünk"
 	},
 	"READ_RECEIPT": {
 		"SUBJECT": "Visszaigazolás (megjelenítve) - %SUBJECT%",
@@ -354,7 +355,6 @@
 		"LABEL_ACCOUNTS_NAME": "Fiókok",
 		"LABEL_IDENTITIES_NAME": "Identitások",
 		"LABEL_FILTERS_NAME": "Szűrők",
-		"LABEL_TEMPLATES_NAME": "Sablonok",
 		"LABEL_SECURITY_NAME": "Biztonság",
 		"LABEL_THEMES_NAME": "Témák"
 	},
@@ -396,6 +396,8 @@
 		"LABEL_SHOW_IMAGES": "Mindig jelenítse meg a külső képeket az üzenet törzsében",
 		"LABEL_REMOVE_COLORS": "Remove background and text colors from message body",
 		"LABEL_MESSAGE_PER_PAGE": "Üzenetek egy oldalon",
+		"LABEL_MARK_MESSAGE_READ_AFTER": "Jelölje meg az üzenetet olvasottként",
+		"SECONDS": "másodperc után",
 		"LABEL_NOTIFICATIONS": "Értesítések",
 		"LABEL_SOUND_NOTIFICATION": "Hangos értesítés",
 		"LABEL_CHROME_NOTIFICATION_DESC": "Új üzenetek értesítő ablakainak megjelenítése",
@@ -436,7 +438,14 @@
 		"HELP_DELETE_FOLDER": "Mappa törlés",
 		"HELP_SHOW_HIDE_FOLDER": "Mappa mutatás\/elrejtés",
 		"HELP_CHECK_FOR_NEW_MESSAGES": "Ellenőrizze\/ne ellenőrizze az új üzeneteket",
-		"HIDE_UNSUBSCRIBED": "Hide unsubscribed folders"
+		"HIDE_UNSUBSCRIBED": "Hide unsubscribed folders",
+		"TYPE_CALENDAR": "Naptár",
+		"TYPE_CONFIGURATION": "Konfiguráció",
+		"TYPE_CONTACTS": "Kapcsolatok",
+		"TYPE_FILES": "Fájlok",
+		"TYPE_JOURNAL": "Folyóirat",
+		"TYPE_NOTES": "Jegyzetek",
+		"TYPE_TASKS": "Feladatok"
 	},
 	"SETTINGS_ACCOUNTS": {
 		"LEGEND_ACCOUNTS": "Fiók lista",

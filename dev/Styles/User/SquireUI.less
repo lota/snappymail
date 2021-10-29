@@ -137,7 +137,6 @@ Secondly, we can't rely on MUA's what to do with :empty
 */
 
 .squire-plain {
-	background-color: #fff;
 	border: 0;
 	border-radius: 0;
 	display: none;
@@ -174,4 +173,8 @@ Secondly, we can't rely on MUA's what to do with :empty
 }
 .rl-mobile .b-compose.modal {
 	min-height: calc(100% - 62px);
+}
+
+.RL-PopupsCompose[data-wysiwyg*=Forced] #squire-toolgroup-mode {
+	display: none;
 }

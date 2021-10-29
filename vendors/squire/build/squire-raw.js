@@ -17,6 +17,7 @@ const
 	DOCUMENT_FRAGMENT_NODE = 11,     // Node.DOCUMENT_FRAGMENT_NODE,
 	SHOW_ELEMENT = 1,                // NodeFilter.SHOW_ELEMENT,
 	SHOW_TEXT = 4,                   // NodeFilter.SHOW_TEXT,
+	SHOW_ELEMENT_OR_TEXT = 5,
 
 	START_TO_START = 0, // Range.START_TO_START
 	START_TO_END = 1,   // Range.START_TO_END
@@ -31,12 +32,10 @@ const
 	ua = navigator.userAgent,
 
 	isMac = /Mac OS X/.test( ua ),
-	isWin = /Windows NT/.test( ua ),
 	isIOS = /iP(?:ad|hone|od)/.test( ua ) || ( isMac && !!navigator.maxTouchPoints ),
 
 	isGecko = /Gecko\//.test( ua ),
-	isEdge = /Edge\//.test( ua ),
-	isWebKit = !isEdge && /WebKit\//.test( ua ),
+	isWebKit = /WebKit\//.test( ua ),
 
 	ctrlKey = isMac ? 'meta-' : 'ctrl-',
 	osKey = isMac ? 'metaKey' : 'ctrlKey',
@@ -142,15 +141,7 @@ const
 		);
 	},
 	hasTagAttributes = ( node, tag, attributes ) => {
-		if ( node.nodeName !== tag ) {
-			return false;
-		}
-		for ( let attr in attributes ) {
-			if ( node.getAttribute( attr ) !== attributes[ attr ] ) {
-				return false;
-			}
-		}
-		return true;
+		return node.nodeName === tag && Object.entries(attributes).every(([k,v]) => node.getAttribute(k) === v);
 	},
 	getClosest = ( node, root, selector ) => {
 		node = (!node || node.closest ? node : node.parentElement);
@@ -212,31 +203,25 @@ const
 
 	setStyle = ( node, style ) => {
 		if (typeof style === 'object') {
-			for ( let p in style ) {
-				node.style[p] = style[p];
-			}
+			Object.entries(style).forEach(([k,v]) => node.style[k] = v);
 		} else if ( style !== undefined ) {
 			node.setAttribute( 'style', style );
 		}
 	},
 
 	createElement = ( tag, props, children ) => {
-		let el = doc.createElement( tag ),
-			attr, value;
+		let el = doc.createElement( tag );
 		if ( props instanceof Array ) {
 			children = props;
 			props = null;
 		}
-		if ( props ) {
-			for ( attr in props ) {
-				value = props[ attr ];
-				if ('style' === attr) {
-					setStyle( el, value );
-				} else if ( value !== undefined ) {
-					el.setAttribute( attr, value );
-				}
+		props && Object.entries(props).forEach(([k,v]) => {
+			if ('style' === k) {
+				setStyle( el, v );
+			} else if ( v !== undefined ) {
+				el.setAttribute( k, v );
 			}
-		}
+		});
 		children && el.append( ...children );
 		return el;
 	},
@@ -529,13 +514,12 @@ const
 
 		if ( prev && areAlike( prev, node ) ) {
 			if ( !isContainer( prev ) ) {
-				if ( isListItem ) {
-					block = createElement( 'DIV' );
-					block.append( empty( prev ) );
-					prev.append( block );
-				} else {
+				if ( !isListItem ) {
 					return;
 				}
+				block = createElement( 'DIV' );
+				block.append( empty( prev ) );
+				prev.append( block );
 			}
 			detach( node );
 			needsFix = !isContainer( node );
@@ -726,11 +710,11 @@ const
 
 		// Ensure root has a block-level element in it.
 		child = root.firstChild;
-		if ( !child || child.nodeName === 'BR' ) {
+		if ( child && child.nodeName !== 'BR' ) {
+			range.collapse( true );
+		} else {
 			fixCursor( root, root );
 			range.selectNodeContents( root.firstChild );
-		} else {
-			range.collapse( true );
 		}
 		return frag;
 	},
@@ -860,24 +844,13 @@ const
 
 		nodeRange.selectNode( node );
 
-		if ( partial ) {
-			// Node must not finish before range starts or start after range
-			// finishes.
-			let nodeEndBeforeStart = ( range.compareBoundaryPoints(
-					END_TO_START, nodeRange ) > -1 ),
-				nodeStartAfterEnd = ( range.compareBoundaryPoints(
-					START_TO_END, nodeRange ) < 1 );
-			return ( !nodeEndBeforeStart && !nodeStartAfterEnd );
-		}
-		else {
-			// Node must start after range starts and finish before range
-			// finishes
-			let nodeStartAfterStart = ( range.compareBoundaryPoints(
-					START_TO_START, nodeRange ) < 1 ),
-				nodeEndBeforeEnd = ( range.compareBoundaryPoints(
-					END_TO_END, nodeRange ) > -1 );
-			return ( nodeStartAfterStart && nodeEndBeforeEnd );
-		}
+		return partial
+			// Node must not finish before range starts or start after range finishes.
+			? range.compareBoundaryPoints( END_TO_START, nodeRange ) < 0
+				&& range.compareBoundaryPoints( START_TO_END, nodeRange ) > 0
+			// Node must start after range starts and finish before range finishes
+			: range.compareBoundaryPoints( START_TO_START, nodeRange ) < 1
+				&& range.compareBoundaryPoints( END_TO_END, nodeRange ) > -1;
 	},
 
 	moveRangeBoundariesDownTree = range => {
@@ -1001,8 +974,7 @@ const
 		} else if ( container !== root && isBlock( container ) ) {
 			block = container;
 		} else {
-			block = getNodeBefore( container, range.startOffset );
-			block = getNextBlock( block, root );
+			block = getNextBlock( getNodeBefore( container, range.startOffset ), root );
 		}
 		// Check the block actually intersects the range
 		return block && isNodeContainedInRange( range, block ) ? block : null;
@@ -1034,7 +1006,7 @@ const
 	},
 
 	newContentWalker = root => createTreeWalker( root,
-		SHOW_TEXT|SHOW_ELEMENT,
+		SHOW_ELEMENT_OR_TEXT,
 		node => node.nodeType === TEXT_NODE ? notWS.test( node.data ) : node.nodeName === 'IMG'
 	),
 
@@ -1206,7 +1178,7 @@ const
 		// Save undo checkpoint and add any links in the preceding section.
 		// Remove any zws so we don't think there's content in an empty
 		// block.
-		self._recordUndoState( range );
+		self._recordUndoState( range, false );
 		if ( self._config.addLinks ) {
 			addLinks( range.startContainer, root, self );
 		}
@@ -1413,16 +1385,15 @@ const
 
 	replaceStyles = node => {
 		let style = node.style;
-		let attr, converter, css, newTreeBottom, newTreeTop, el;
+		let css, newTreeBottom, newTreeTop, el;
 
-		for ( attr in styleToSemantic ) {
-			converter = styleToSemantic[ attr ];
+		Object.entries(styleToSemantic).forEach(([attr,converter])=>{
 			css = style[ attr ];
 			if ( css && converter.regexp.test( css ) ) {
 				el = converter.replace( doc, css );
 				if ( el.nodeName === node.nodeName &&
 						el.className === node.className ) {
-					continue;
+					return;
 				}
 				if ( !newTreeTop ) {
 					newTreeTop = el;
@@ -1433,7 +1404,7 @@ const
 				newTreeBottom = el;
 				node.style[ attr ] = '';
 			}
-		}
+		});
 
 		if ( newTreeTop ) {
 			newTreeBottom.append( empty( node ) );
@@ -1505,7 +1476,7 @@ const
 		while ( isInline( nonInlineParent ) ) {
 			nonInlineParent = nonInlineParent.parentNode;
 		}
-		let walker = createTreeWalker( nonInlineParent, SHOW_TEXT|SHOW_ELEMENT );
+		let walker = createTreeWalker( nonInlineParent, SHOW_ELEMENT_OR_TEXT );
 
 		for ( i = 0, l = children.length; i < l; ++i ) {
 			child = children[i];
@@ -1612,7 +1583,7 @@ const
 		while ( isInline( block ) ) {
 			block = block.parentNode;
 		}
-		walker = createTreeWalker( block, SHOW_ELEMENT|SHOW_TEXT, notWSTextNode );
+		walker = createTreeWalker( block, SHOW_ELEMENT_OR_TEXT, notWSTextNode );
 		walker.currentNode = br;
 		return !!walker.nextNode() ||
 			( isLBIfEmptyBlock && !walker.previousNode() );
@@ -1680,13 +1651,6 @@ const
 		text = text.replace( NBSP, ' ' ); // Replace nbsp with regular space
 		node.remove(  );
 
-		// Firefox (and others?) returns unix line endings (\n) even on Windows.
-		// If on Windows, normalise to \r\n, since Notepad and some other crappy
-		// apps do not understand just \n.
-		if ( isWin ) {
-			text = text.replace( /\r?\n/g, '\r\n' );
-		}
-
 		if ( text !== html ) {
 			clipboardData.setData( 'text/html', html );
 		}
@@ -1695,20 +1659,14 @@ const
 	},
 
 	mergeObjects = ( base, extras, mayOverride ) => {
-		let prop, value;
-		if ( !base ) {
-			base = {};
-		}
-		if ( extras ) {
-			for ( prop in extras ) {
-				if ( mayOverride || !( prop in base ) ) {
-					value = extras[ prop ];
-					base[ prop ] = ( value && value.constructor === Object ) ?
-						mergeObjects( base[ prop ], value, mayOverride ) :
-						value;
-				}
+		base = base || {};
+		extras && Object.entries(extras).forEach(([prop,value])=>{
+			if ( mayOverride || !( prop in base ) ) {
+				base[ prop ] = ( value && value.constructor === Object ) ?
+					mergeObjects( base[ prop ], value, mayOverride ) :
+					value;
 			}
-		}
+		});
 		return base;
 	},
 
@@ -1776,13 +1734,8 @@ const
 	},
 
 	splitBlock = ( self, block, node, offset ) => {
-		let splitTag = tagAfterSplit[ block.nodeName ],
-			nodeAfterSplit = split( node, offset, block.parentNode, self._root ),
-			config = self._config;
-
-		if ( !splitTag ) {
-			splitTag = config.blockTag;
-		}
+		let splitTag = tagAfterSplit[ block.nodeName ] || self._config.blockTag,
+			nodeAfterSplit = split( node, offset, block.parentNode, self._root );
 
 		// Make sure the new node is the correct type.
 		if ( !hasTagAttributes( nodeAfterSplit, splitTag, {} ) ) {
@@ -1929,7 +1882,7 @@ let contentWalker,
 TreeWalker.prototype.previousPONode = function () {
 	let current = this.currentNode,
 		root = this.root,
-		nodeType = this.nodeType,
+		nodeType = this.nodeType, // whatToShow?
 		filter = this.filter,
 		node;
 	while ( current ) {
@@ -1962,11 +1915,6 @@ function onKey ( event ) {
 		if ( event.altKey  ) { modifiers += 'alt-'; }
 		if ( event[osKey] ) { modifiers += ctrlKey; }
 		if ( event.shiftKey ) { modifiers += 'shift-'; }
-	}
-	// However, on Windows, shift-delete is apparently "cut" (WTF right?), so
-	// we want to let the browser handle shift-delete in this situation.
-	if ( isWin && event.shiftKey && key === 'delete' ) {
-		modifiers += 'shift-';
 	}
 
 	key = modifiers + key;
@@ -2003,7 +1951,7 @@ function onCut ( event ) {
 	this.saveUndoState( range );
 
 	// Edge only seems to support setting plain text as of 2016-03-11.
-	if ( !isEdge && event.clipboardData ) {
+	if ( event.clipboardData ) {
 		// Clipboard content should include all parents within block, or all
 		// parents up to root if selection across blocks
 		startBlock = getStartBlockOfRange( range, root );
@@ -2040,7 +1988,7 @@ function onCut ( event ) {
 
 function onCopy ( event ) {
 	// Edge only seems to support setting plain text as of 2016-03-11.
-	if ( !isEdge && event.clipboardData ) {
+	if ( event.clipboardData ) {
 		let range = this.getSelection(), root = this._root,
 			// Clipboard content should include all parents within block, or all
 			// parents up to root if selection across blocks
@@ -2140,15 +2088,13 @@ function onPaste ( event ) {
 		// indication there should be an HTML part. However, it does support
 		// access to image data, so we check for that first. Otherwise though,
 		// fall through to fallback clipboard handling methods
-		if ( !isEdge ) {
-			event.preventDefault();
-			if ( htmlItem && ( !choosePlain || !plainItem ) ) {
-				htmlItem.getAsString( html => self.insertHTML( html, true ) );
-			} else if ( plainItem ) {
-				plainItem.getAsString( text => self.insertPlainText( text, true ) );
-			}
-			return;
+		event.preventDefault();
+		if ( htmlItem && ( !choosePlain || !plainItem ) ) {
+			htmlItem.getAsString( html => self.insertHTML( html, true ) );
+		} else if ( plainItem ) {
+			plainItem.getAsString( text => self.insertPlainText( text, true ) );
 		}
+		return;
 	}
 
 	// Safari (and indeed many other OS X apps) copies stuff as text/rtf
@@ -2156,11 +2102,11 @@ function onPaste ( event ) {
 	// to get an HTML version is to fallback to letting the browser insert
 	// the content. Same for getting image data. *Sigh*.
 	types = clipboardData && clipboardData.types;
-	if ( !isEdge && types && (
-			indexOf( types, 'text/html' ) > -1 || (
+	if ( types && (
+			types.includes( 'text/html' ) || (
 				!isGecko &&
-				indexOf( types, 'text/plain' ) > -1 &&
-				indexOf( types, 'text/rtf' ) < 0 )
+				types.includes( 'text/plain') &&
+				!types.includes( 'text/rtf' ))
 			)) {
 		event.preventDefault();
 		// Abiword on Linux copies a plain text and html version, but the HTML
@@ -2170,9 +2116,7 @@ function onPaste ( event ) {
 		// text/plain item onto the clipboard. Why? Who knows.
 		if ( !choosePlain && ( data = clipboardData.getData( 'text/html' ) ) ) {
 			this.insertHTML( data, true );
-		} else if (
-				( data = clipboardData.getData( 'text/plain' ) ) ||
-				( data = clipboardData.getData( 'text/uri-list' ) ) ) {
+		} else if ( data = clipboardData.getData( 'text/plain' ) || clipboardData.getData( 'text/uri-list' ) ) {
 			this.insertPlainText( data, true );
 		}
 		return;
@@ -2185,21 +2129,20 @@ function onPaste ( event ) {
 function onDrop ( event ) {
 	let types = event.dataTransfer.types;
 	let l = types.length;
-	let hasPlain = false;
-	let hasHTML = false;
+	let hasData = false;
 	while ( l-- ) {
 		switch ( types[l] ) {
 		case 'text/plain':
-			hasPlain = true;
-			break;
 		case 'text/html':
-			hasHTML = true;
+			hasData = true;
 			break;
 		default:
 			return;
 		}
 	}
-	if ( hasHTML || hasPlain ) {
+
+//	if ( types.includes('text/plain') || types.includes('text/html') ) {
+	if ( hasData ) {
 		this.saveUndoState();
 	}
 }
@@ -2405,7 +2348,7 @@ let keyHandlers = {
 	space: ( self, _, range ) => {
 		let node;
 		let root = self._root;
-		self._recordUndoState( range );
+		self._recordUndoState( range, false );
 		if ( self._config.addLinks ) {
 			addLinks( range.startContainer, root, self );
 		}
@@ -2470,6 +2413,123 @@ keyHandlers[ ctrlKey + 'z' ] = mapKeyTo( 'undo' );
 keyHandlers[ 'undo' ] = mapKeyTo( 'undo' );
 keyHandlers[ ctrlKey + 'shift-z' ] = mapKeyTo( 'redo' );
 
+class EditStack extends Array
+{
+	constructor(squire) {
+		super();
+		this.squire = squire;
+		this.index = -1;
+		this.inUndoState = false;
+
+		this.threshold = -1; // -1 means no threshold
+		this.limit = -1; // -1 means no limit
+	}
+
+	clear() {
+		this.index = -1;
+		this.length = 0;
+	}
+
+	stateChanged ( /*canUndo, canRedo*/ ) {
+		this.squire.fireEvent( 'undoStateChange', {
+			canUndo: this.index > 0,
+			canRedo: this.index + 1 < this.length
+		});
+		this.squire.fireEvent( 'input' );
+	}
+
+	docWasChanged () {
+		if ( this.inUndoState ) {
+			this.inUndoState = false;
+			this.stateChanged ( /*true, false*/ );
+		} else
+			this.squire.fireEvent( 'input' );
+	}
+
+	// Leaves bookmark
+	recordUndoState ( range, replace ) {
+		replace = replace !== false && this.inUndoState;
+		// Don't record if we're already in an undo state
+		if ( !this.inUndoState || replace ) {
+			// Advance pointer to new position
+			let undoIndex = this.index;
+			let undoThreshold = this.threshold;
+			let undoLimit = this.limit;
+			let squire = this.squire;
+			let html;
+
+			if ( !replace ) {
+				++undoIndex;
+			}
+			undoIndex = Math.max(0, undoIndex);
+
+			// Truncate stack if longer (i.e. if has been previously undone)
+			this.length = Math.min(undoIndex + 1, this.length);
+
+			// Get data
+			if ( range ) {
+				squire._saveRangeToBookmark( range );
+			}
+			html = squire._getHTML();
+
+			// If this document is above the configured size threshold,
+			// limit the number of saved undo states.
+			// Threshold is in bytes, JS uses 2 bytes per character
+			if ( undoThreshold > -1 && html.length * 2 > undoThreshold
+			 && undoLimit > -1 && undoIndex > undoLimit ) {
+				this.splice( 0, undoIndex - undoLimit );
+			}
+
+			// Save data
+			this[ undoIndex ] = html;
+			this.index = undoIndex;
+			this.inUndoState = true;
+		}
+	}
+
+	saveUndoState ( range ) {
+		let squire = this.squire;
+		if ( range === undefined ) {
+			range = squire.getSelection();
+		}
+		this.recordUndoState( range );
+		squire._getRangeAndRemoveBookmark( range );
+	}
+
+	undo () {
+		let squire = this.squire,
+			undoIndex = this.index - 1;
+		// Sanity check: must not be at beginning of the history stack
+		if ( undoIndex >= 0 || !this.inUndoState ) {
+			// Make sure any changes since last checkpoint are saved.
+			this.recordUndoState( squire.getSelection(), false );
+			this.index = undoIndex;
+			squire._setHTML( this[ undoIndex ] );
+			let range = squire._getRangeAndRemoveBookmark();
+			if ( range ) {
+				squire.setSelection( range );
+			}
+			this.inUndoState = true;
+			this.stateChanged ( /*undoIndex > 0, true*/ );
+		}
+	}
+
+	redo () {
+		// Sanity check: must not be at end of stack and must be in an undo state.
+		let squire = this.squire,
+			undoIndex = this.index + 1;
+		if ( undoIndex < this.length && this.inUndoState ) {
+			this.index = undoIndex;
+			squire._setHTML( this[ undoIndex ] );
+			let range = squire._getRangeAndRemoveBookmark();
+			if ( range ) {
+				squire.setSelection( range );
+			}
+			this.stateChanged ( /*true, undoIndex + 1 < this.length*/ );
+		}
+	}
+}
+
 class Squire
 {
 	constructor (root, config) {
@@ -2501,10 +2561,7 @@ class Squire
 		};
 		this.addEventListener('selectstart', () => this.addEventListener('selectionchange', selectionchange));
 
-		this._undoIndex = -1;
-		this._undoStack = [];
-		this._undoStackLength = 0;
-		this._isInUndoState = false;
+		this.editStack = new EditStack(this);
 		this._ignoreChange = false;
 		this._ignoreAllChanges = false;
 
@@ -2558,10 +2615,6 @@ class Squire
 	setConfig ( config ) {
 		config = mergeObjects({
 			blockTag: 'DIV',
-			undo: {
-				documentSizeThreshold: -1, // -1 means no threshold
-				undoLimit: -1 // -1 means no limit
-			},
 			addLinks: true
 		}, config, true );
 
@@ -2663,24 +2716,6 @@ class Squire
 		return this;
 	}
 
-	destroy () {
-		let events = this._events;
-		let type;
-
-		for ( type in events ) {
-			this.removeEventListener( type );
-		}
-		if ( this._mutation ) {
-			this._mutation.disconnect();
-		}
-		delete this._root.__squire__;
-
-		// Destroy undo stack
-		this._undoIndex = -1;
-		this._undoStack = [];
-		this._undoStackLength = 0;
-	}
-
 	handleEvent ( event ) {
 		this.fireEvent( event.type, event );
 	}
@@ -2766,9 +2801,7 @@ class Squire
 			this._lastRange = range;
 			// If we're setting selection, that automatically, and synchronously, // triggers a focus event. So just store the selection and mark it as
 			// needing restore on focus.
-			if ( !this._isFocused ) {
-				this._restoreSelection = true;
-			} else {
+			if ( this._isFocused ) {
 				// iOS bug: if you don't focus the iframe before setting the
 				// selection, you can end up in a state where you type but the input
 				// doesn't get directed into the contenteditable area but is instead
@@ -2789,6 +2822,8 @@ class Squire
 					sel.removeAllRanges();
 					sel.addRange( range );
 				}
+			} else {
+				this._restoreSelection = true;
 			}
 		}
 		return this;
@@ -2849,7 +2884,7 @@ class Squire
 		}
 		let walker = createTreeWalker(
 			range.commonAncestorContainer,
-			SHOW_TEXT|SHOW_ELEMENT,
+			SHOW_ELEMENT_OR_TEXT,
 			node => isNodeContainedInRange( range, node )
 		);
 		let startContainer = range.startContainer;
@@ -2896,11 +2931,8 @@ class Squire
 	// WebKit bug: https://bugs.webkit.org/show_bug.cgi?id=15256
 
 	_addZWS () {
-		if ( isWebKit ) {
-			this._hasZWS = true;
-			return doc.createTextNode( ZWS );
-		}
-		return doc.createTextNode( '' );
+		this._hasZWS = isWebKit;
+		return doc.createTextNode( isWebKit ? ZWS : '' );
 	}
 	_removeZWS () {
 		if ( this._hasZWS ) {
@@ -3024,121 +3056,29 @@ class Squire
 
 	_docWasChanged () {
 		nodeCategoryCache = new WeakMap();
-		if ( this._ignoreAllChanges ) {
-			return;
+		if ( !this._ignoreAllChanges ) {
+			if ( this._ignoreChange ) {
+				this._ignoreChange = false;
+			} else {
+				this.editStack.docWasChanged();
+			}
 		}
-
-		if ( this._ignoreChange ) {
-			this._ignoreChange = false;
-			return;
-		}
-		if ( this._isInUndoState ) {
-			this._isInUndoState = false;
-			this.fireEvent( 'undoStateChange', {
-				canUndo: true,
-				canRedo: false
-			});
-		}
-		this.fireEvent( 'input' );
 	}
 
-	// Leaves bookmark
 	_recordUndoState ( range, replace ) {
-		// Don't record if we're already in an undo state
-		if ( !this._isInUndoState|| replace ) {
-			// Advance pointer to new position
-			let undoIndex = this._undoIndex;
-			let undoStack = this._undoStack;
-			let undoConfig = this._config.undo;
-			let undoThreshold = undoConfig.documentSizeThreshold;
-			let undoLimit = undoConfig.undoLimit;
-			let html;
-
-			if ( !replace ) {
-				++undoIndex;
-			}
-
-			// Truncate stack if longer (i.e. if has been previously undone)
-			if ( undoIndex < this._undoStackLength ) {
-				undoStack.length = this._undoStackLength = undoIndex;
-			}
-
-			// Get data
-			if ( range ) {
-				this._saveRangeToBookmark( range );
-			}
-			html = this._getHTML();
-
-			// If this document is above the configured size threshold,
-			// limit the number of saved undo states.
-			// Threshold is in bytes, JS uses 2 bytes per character
-			if ( undoThreshold > -1 && html.length * 2 > undoThreshold ) {
-				if ( undoLimit > -1 && undoIndex > undoLimit ) {
-					undoStack.splice( 0, undoIndex - undoLimit );
-					undoIndex = undoLimit;
-					this._undoStackLength = undoLimit;
-				}
-			}
-
-			// Save data
-			undoStack[ undoIndex ] = html;
-			this._undoIndex = undoIndex;
-			++this._undoStackLength;
-			this._isInUndoState = true;
-		}
+		this.editStack.recordUndoState( range, replace );
 	}
 
 	saveUndoState ( range ) {
-		if ( range === undefined ) {
-			range = this.getSelection();
-		}
-		this._recordUndoState( range, this._isInUndoState );
-		this._getRangeAndRemoveBookmark( range );
-
-		return this;
+		this.editStack.saveUndoState( range );
 	}
 
 	undo () {
-		// Sanity check: must not be at beginning of the history stack
-		if ( this._undoIndex !== 0 || !this._isInUndoState ) {
-			// Make sure any changes since last checkpoint are saved.
-			this._recordUndoState( this.getSelection(), false );
-
-			--this._undoIndex;
-			this._setHTML( this._undoStack[ this._undoIndex ] );
-			let range = this._getRangeAndRemoveBookmark();
-			if ( range ) {
-				this.setSelection( range );
-			}
-			this._isInUndoState = true;
-			this.fireEvent( 'undoStateChange', {
-				canUndo: this._undoIndex !== 0,
-				canRedo: true
-			});
-			this.fireEvent( 'input' );
-		}
-		return this;
+		this.editStack.undo();
 	}
 
 	redo () {
-		// Sanity check: must not be at end of stack and must be in an undo
-		// state.
-		let undoIndex = this._undoIndex,
-			undoStackLength = this._undoStackLength;
-		if ( undoIndex + 1 < undoStackLength && this._isInUndoState ) {
-			++this._undoIndex;
-			this._setHTML( this._undoStack[ this._undoIndex ] );
-			let range = this._getRangeAndRemoveBookmark();
-			if ( range ) {
-				this.setSelection( range );
-			}
-			this.fireEvent( 'undoStateChange', {
-				canUndo: true,
-				canRedo: undoIndex + 2 < undoStackLength
-			});
-			this.fireEvent( 'input' );
-		}
-		return this;
+		this.editStack.redo();
 	}
 
 	// --- Inline formatting ---
@@ -3282,7 +3222,7 @@ class Squire
 			// them, and adding other styles is harmless.
 			walker = createTreeWalker(
 				range.commonAncestorContainer,
-				SHOW_TEXT|SHOW_ELEMENT,
+				SHOW_ELEMENT_OR_TEXT,
 				node => ( node.nodeType === TEXT_NODE ||
 							node.nodeName === 'BR' ||
 							node.nodeName === 'IMG'
@@ -3515,7 +3455,7 @@ class Squire
 		}
 
 		// 1. Save undo checkpoint and bookmark selection
-		this._recordUndoState( range, this._isInUndoState );
+		this._recordUndoState( range );
 
 		let root = this._root;
 		let frag;
@@ -3563,7 +3503,7 @@ class Squire
 		}
 
 		// Save undo checkpoint and bookmark selection
-		this._recordUndoState( range, this._isInUndoState );
+		this._recordUndoState( range );
 
 		// Increase list depth
 		let type = list.nodeName;
@@ -3613,7 +3553,7 @@ class Squire
 		}
 
 		// Save undo checkpoint and bookmark selection
-		this._recordUndoState( range, this._isInUndoState );
+		this._recordUndoState( range );
 
 		if ( startLi ) {
 			// Find the new parent list node
@@ -3668,13 +3608,6 @@ class Squire
 				last.nodeName !== this._config.blockTag || !isBlock( last ) ) {
 			root.append( this.createDefaultBlock() );
 		}
-	}
-
-	// --- Keyboard interaction ---
-
-	setKeyHandler ( key, fn ) {
-		this._keyHandlers[ key ] = fn;
-		return this;
 	}
 
 	// --- Get/Set data ---
@@ -3751,10 +3684,7 @@ class Squire
 		fixCursor( root, root );
 
 		// Reset the undo stack
-		this._undoIndex = -1;
-		this._undoStack.length = 0;
-		this._undoStackLength = 0;
-		this._isInUndoState = false;
+		this.editStack.clear();
 
 		// Record undo state
 		let range = this._getRangeAndRemoveBookmark() ||

@@ -18,7 +18,7 @@ ko.bindingHandlers['event'] = {
         var eventsToHandle = valueAccessor() || {};
         ko.utils.objectForEach(eventsToHandle, eventName => {
             if (typeof eventName == "string") {
-                ko.utils.registerEventHandler(element, eventName, function (event) {
+                element.addEventListener(eventName, function (event) {
                     var handlerReturnValue;
                     var handlerFunction = valueAccessor()[eventName];
                     if (!handlerFunction)
@@ -32,12 +32,6 @@ ko.bindingHandlers['event'] = {
                         if (handlerReturnValue !== true) { // Normally we want to prevent default action. Developer can override this be explicitly returning true.
                             event.preventDefault();
                         }
-                    }
-
-                    var bubble = allBindings.get(eventName + 'Bubble') !== false;
-                    if (!bubble) {
-                        event.cancelBubble = true;
-                        event.stopPropagation();
                     }
                 });
             }

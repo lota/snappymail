@@ -17,6 +17,9 @@ namespace MailSo\Imap;
  */
 class Folder
 {
+	// RFC5258 Response data STATUS items when using LIST-EXTENDED
+	use Traits\Status;
+
 	/**
 	 * @var string
 	 */
@@ -35,57 +38,41 @@ class Folder
 	/**
 	 * @var array
 	 */
-	private $aFlags;
-
-	/**
-	 * @var array
-	 */
 	private $aFlagsLowerCase;
 
 	/**
-	 * @var array
+	 * RFC 5464
 	 */
-	private $aExtended = array();
+	private $aMetadata = array();
 
 	/**
 	 * @throws \MailSo\Base\Exceptions\InvalidArgumentException
 	 */
-	function __construct(string $sFullNameRaw, string $sDelimiter = '.', array $aFlags = array())
+	function __construct(string $sFullNameRaw, string $sDelimiter = null, array $aFlags = array())
 	{
-		$sDelimiter = 'NIL' === \strtoupper($sDelimiter) ? '' : $sDelimiter;
-		if (empty($sDelimiter))
-		{
-			$sDelimiter = '.'; // default delimiter
-		}
-
-		if (1 < \strlen($sDelimiter) || 0 === \strlen($sFullNameRaw))
-		{
+		if (!\strlen($sFullNameRaw)) {
 			throw new \MailSo\Base\Exceptions\InvalidArgumentException;
 		}
-
 		$this->sFullNameRaw = $sFullNameRaw;
+
+		$this->setDelimiter($sDelimiter);
+		$this->setFlags($aFlags);
+	}
+
+	public function setFlags(array $aFlags) : void
+	{
+		$this->aFlagsLowerCase = \array_map('strtolower', $aFlags);
+	}
+
+	public function setDelimiter(?string $sDelimiter) : void
+	{
+		$sDelimiter = 'NIL' === \strtoupper($sDelimiter) ? null : $sDelimiter;
 		$this->sDelimiter = $sDelimiter;
-		$this->aFlags = $aFlags;
-		$this->aFlagsLowerCase = \array_map('strtolower', $this->aFlags);
-
-		$this->sFullNameRaw = 'INBOX'.$this->sDelimiter === \substr(\strtoupper($this->sFullNameRaw), 0, 5 + \strlen($this->sDelimiter)) ?
-			'INBOX'.\substr($this->sFullNameRaw, 5) : $this->sFullNameRaw;
-
-		if ($this->IsInbox())
-		{
-			$this->sFullNameRaw = 'INBOX';
-		}
-
-		$this->sNameRaw = $this->sFullNameRaw;
-		if (0 < \strlen($this->sDelimiter))
-		{
+		if ($sDelimiter) {
 			$aNames = \explode($this->sDelimiter, $this->sFullNameRaw);
-			if (false !== \array_search('', $aNames))
-			{
-				throw new \MailSo\Base\Exceptions\InvalidArgumentException;
-			}
-
 			$this->sNameRaw = \end($aNames);
+		} else {
+			$this->sNameRaw = $this->sFullNameRaw;
 		}
 	}
 
@@ -99,14 +86,9 @@ class Folder
 		return $this->sFullNameRaw;
 	}
 
-	public function Delimiter() : string
+	public function Delimiter() : ?string
 	{
 		return $this->sDelimiter;
-	}
-
-	public function Flags() : array
-	{
-		return $this->aFlags;
 	}
 
 	public function FlagsLowerCase() : array
@@ -116,7 +98,7 @@ class Folder
 
 	public function IsSelectable() : bool
 	{
-		return !\in_array('\\noselect', $this->aFlagsLowerCase);
+		return !\in_array('\\noselect', $this->aFlagsLowerCase) && !\in_array('\\nonexistent', $this->aFlagsLowerCase);
 	}
 
 	public function IsInbox() : bool
@@ -127,16 +109,24 @@ class Folder
 	/**
 	 * @param mixed $mData
 	 */
-	public function SetExtended(string $sName, $mData) : void
+	public function SetMetadata(string $sName, string $sData) : void
 	{
-		$this->aExtended[$sName] = $mData;
+		$this->aMetadata[$sName] = $sData;
 	}
 
 	/**
 	 * @return mixed
 	 */
-	public function GetExtended(string $sName)
+	public function GetMetadata(string $sName) : ?string
 	{
-		return isset($this->aExtended[$sName]) ? $this->aExtended[$sName] : null;
+		return isset($this->aMetadata[$sName]) ? $this->aMetadata[$sName] : null;
+	}
+
+	/**
+	 * @return array
+	 */
+	public function Metadata() : array
+	{
+		return $this->aMetadata;
 	}
 }

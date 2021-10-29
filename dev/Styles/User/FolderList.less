@@ -4,6 +4,10 @@
 
 .b-folders {
 
+	ul {
+		margin: 0;
+	}
+
 	.move-action-content-wrapper {
 		z-index: -1;
 		position: fixed;
@@ -17,12 +21,6 @@
 		background-image: linear-gradient(135deg, #000 25%, transparent 25%,
 			transparent 50%, #000 50%, #000 75%,
 			transparent 75%, transparent);
-	}
-
-	.b-folders-user {
-		a.print-count.system .badge {
-			display: none !important;
-		}
 	}
 
 	.b-toolbar {
@@ -62,12 +60,11 @@
 
 	hr {
 		margin: 10px;
-		border-top: 0;
-		border-bottom: 1px solid #999;
+		border-color: #999;
 	}
 
-	.e-item {
-
+	li {
+		display: block;
 		overflow: hidden;
 		white-space: nowrap;
 
@@ -80,31 +77,10 @@
 			background-color: transparent;
 			vertical-align: middle;
 			color: var(--folders-disabled-color, #666);
-			cursor: not-allowed;
 			font-size: 14px;
 			border-left: 3px solid transparent;
 
-			.inbox-star-icon {
-				display: none;
-				margin-left: 7px;
-
-				.flagged {
-					display: none;
-				}
-				.unflagged {
-					opacity: .5;
-
-					&:hover {
-						opacity: 1;
-					}
-				}
-			}
-
-			&.is-inbox .inbox-star-icon {
-				display: inline;
-			}
-
-			padding: 0 @folderItemPadding;
+			padding: 0 2em 0 @folderItemPadding;
 
 			text-decoration: none;
 
@@ -137,29 +113,14 @@
 					color: var(--folders-selected-color, #eee);
 				}
 			}
+			&:not(.selectable) {
+				cursor: default;
+				font-style: italic;
+			}
 
 			&.focused {
 				background-color: #888;
 				border-left-color: #fff;
-			}
-
-			&.system {
-				cursor: default;
-				color: grey;
-			}
-
-			.count {
-				position: relative;
-				display: none;
-				margin-top: 5px;
-				line-height: 19px;
-			}
-
-			&.print-count {
-				font-weight: bold;
-				.count {
-					display: inline;
-				}
 			}
 
 			&.unread-sub {
@@ -172,66 +133,90 @@
 
 			.e-collapsed-sign {
 				cursor: pointer;
+				font-size: 150%;
 				vertical-align: inherit;
 			}
 		}
 
-		.b-sub-folders.collapsed {
+		a[data-unread] {
+			font-weight: bold;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+
+		ul.collapsed {
 			max-height: 0;
 			height: 0;
 			display: none;
 		}
 	}
 
-	&.inbox-is-starred {
-		.flagged {
+	.b-folders-system a[data-unread]::after,
+	.b-folders-user a[data-unread]:not(.system)::after
+	{
+		content: attr(data-unread);
+		background-color: @grayLight;
+		border-radius: 9px;
+		color: @white;
+		font-size: 11px;
+		line-height: 19px;
+		margin-top: 5px;
+		min-width: 1em;
+		padding: 1px 4px;
+		text-align: center;
+		text-shadow: 0 -1px 0 rgba(0,0,0,.25);
+		position: absolute;
+		right: 3px;
+	}
+
+	.flag-icon {
+		margin-left: 7px;
+	}
+	.flag-icon::after {
+		content:'☆';
+		opacity: .5;
+	}
+	.is-flagged {
+		.flag-icon::after {
 			color: orange;
-			display: inline-block !important;
-		}
-		.unflagged {
-			display: none;
+			content:'★';
+			opacity: 1;
 		}
 	}
 
-	.b-folder-system-item {
+	.b-folders-system {
 		font-weight: bold;
 	}
 
-	.b-sub-folders .e-item a {
+	li li a {
 		padding-left: @subPadding * 1 + @folderItemPadding;
 	}
-	.b-sub-folders .b-sub-folders .e-item a {
+	li li li a {
 		padding-left: @subPadding * 2 + @folderItemPadding;
 	}
-	.b-sub-folders .b-sub-folders .b-sub-folders .e-item a {
+	li li li li a {
 		padding-left: @subPadding * 3 + @folderItemPadding;
 	}
-	.b-sub-folders .b-sub-folders .b-sub-folders .b-sub-folders .e-item a {
+	li li li li li a {
 		padding-left: @subPadding * 4 + @folderItemPadding;
 	}
 
 /**/
-	&.single-root-inbox a.i-am-inbox {
+	&.single-root-inbox .b-folders-user > li > a {
 		display: none !important;
 	}
 
-	&.single-root-inbox .i-am-inbox-wrapper > .b-sub-folders {
-		max-height: none !important;
-		height: inherit !important;
-		display: block !important;
-	}
-
-	&.single-root-inbox .i-am-inbox-wrapper {
-		.b-sub-folders .e-item a {
+	&.single-root-inbox {
+		li li a {
 			padding-left: @folderItemPadding;
 		}
-		.b-sub-folders .b-sub-folders .e-item a {
+		li li li a {
 			padding-left: @subPadding * 1 + @folderItemPadding;
 		}
-		.b-sub-folders .b-sub-folders .b-sub-folders .e-item a {
+		li li li li a {
 			padding-left: @subPadding * 2 + @folderItemPadding;
 		}
-		.b-sub-folders .b-sub-folders .b-sub-folders .b-sub-folders .e-item a {
+		li li li li li a {
 			padding-left: @subPadding * 3 + @folderItemPadding;
 		}
 	}

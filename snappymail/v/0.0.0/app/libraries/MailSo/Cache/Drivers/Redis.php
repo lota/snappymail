@@ -19,16 +19,6 @@ namespace MailSo\Cache\Drivers;
 class Redis implements \MailSo\Cache\DriverInterface
 {
 	/**
-	 * @var string
-	 */
-	private $sHost;
-
-	/**
-	 * @var int
-	 */
-	private $iPost;
-
-	/**
 	 * @var int
 	 */
 	private $iExpire;
@@ -43,19 +33,18 @@ class Redis implements \MailSo\Cache\DriverInterface
 	 */
 	private $sKeyPrefix;
 
-	function __construct(string $sHost = '127.0.0.1', int $iPost = 6379, int $iExpire = 43200, string $sKeyPrefix = '')
+
+	function __construct(string $sHost = '127.0.0.1', int $iPort = 6379, int $iExpire = 43200, string $sKeyPrefix = '')
 	{
-		$this->sHost = $sHost;
-		$this->iPost = $iPost;
 		$this->iExpire = 0 < $iExpire ? $iExpire : 43200;
 
 		$this->oRedis = null;
 
 		try
 		{
-			$this->oRedis = new \Predis\Client('unix:' === substr($sHost, 0, 5) ? $sHost : array(
+			$this->oRedis = new \Predis\Client(\strpos($sHost, ':/') ? $sHost : array(
 				'host' => $sHost,
-				'port' => $iPost
+				'port' => $iPort
 			));
 
 			$this->oRedis->connect();
@@ -81,7 +70,14 @@ class Redis implements \MailSo\Cache\DriverInterface
 
 	public function Set(string $sKey, string $sValue) : bool
 	{
-		return $this->oRedis ? $this->oRedis->setex($this->generateCachedKey($sKey), $this->iExpire, $sValue) : false;
+		if (!$this->oRedis)
+		{
+			return false;
+		}
+
+		$sValue = $this->oRedis->setex($this->generateCachedKey($sKey), $this->iExpire, $sValue);
+
+		return $sValue === true || $sValue == 'OK';
 	}
 
 	public function Get(string $sKey) : string

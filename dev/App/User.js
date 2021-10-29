@@ -1,6 +1,6 @@
 import 'External/User/ko';
 
-import { isArray, isNonEmptyArray, pInt, pString } from 'Common/Utils';
+import { isArray, arrayLength, pInt, pString } from 'Common/Utils';
 import { isPosNumeric, delegateRunOnDestroy, mailToHelper } from 'Common/UtilsUser';
 
 import {
@@ -51,7 +51,6 @@ import { NotificationUserStore } from 'Stores/User/Notification';
 import { AccountUserStore } from 'Stores/User/Account';
 import { ContactUserStore } from 'Stores/User/Contact';
 import { IdentityUserStore } from 'Stores/User/Identity';
-import { TemplateUserStore } from 'Stores/User/Template';
 import { FolderUserStore } from 'Stores/User/Folder';
 import { PgpUserStore } from 'Stores/User/Pgp';
 import { MessageUserStore } from 'Stores/User/Message';
@@ -65,14 +64,13 @@ import Remote from 'Remote/User/Fetch';
 import { EmailModel } from 'Model/Email';
 import { AccountModel } from 'Model/Account';
 import { IdentityModel } from 'Model/Identity';
-import { TemplateModel } from 'Model/Template';
 import { OpenPgpKeyModel } from 'Model/OpenPgpKey';
 
 import { LoginUserScreen } from 'Screen/User/Login';
 import { MailBoxUserScreen } from 'Screen/User/MailBox';
 import { SettingsUserScreen } from 'Screen/User/Settings';
 
-import { startScreens, showScreenPopup } from 'Knoin/Knoin';
+import { startScreens, showScreenPopup, arePopupsVisible } from 'Knoin/Knoin';
 
 import { AbstractApp } from 'App/Abstract';
 
@@ -185,33 +183,6 @@ class AppUser extends AbstractApp {
 		Remote.messageList(null, {Folder: getFolderInboxName()}, true);
 	}
 
-	/**
-	 * @param {Function} fResultFunc
-	 * @returns {boolean}
-	 */
-	contactsSync(fResultFunc) {
-		if (
-			ContactUserStore.importing() ||
-			ContactUserStore.syncing() ||
-			!ContactUserStore.enableSync() ||
-			!ContactUserStore.allowSync()
-		) {
-			return false;
-		}
-
-		ContactUserStore.syncing(true);
-
-		Remote.contactsSync((sResult, oData) => {
-			ContactUserStore.syncing(false);
-
-			if (fResultFunc) {
-				fResultFunc(sResult, oData);
-			}
-		});
-
-		return true;
-	}
-
 	messagesMoveTrigger() {
 		const sTrashFolder = FolderUserStore.trashFolder(),
 			sSpamFolder = FolderUserStore.spamFolder();
@@ -261,7 +232,7 @@ class AppUser extends AbstractApp {
 			setFolderHash(FolderUserStore.currentFolderFullNameRaw(), '');
 			alert(getNotification(iError));
 		} else if (FolderUserStore.currentFolder()) {
-			if (isArray(oData.Result) && 2 === oData.Result.length) {
+			if (2 === arrayLength(oData.Result)) {
 				setFolderHash(oData.Result[0], oData.Result[1]);
 			} else {
 				setFolderHash(FolderUserStore.currentFolderFullNameRaw(), '');
@@ -348,7 +319,7 @@ class AppUser extends AbstractApp {
 	 * @param {boolean=} bCopy = false
 	 */
 	moveMessagesToFolder(sFromFolderFullNameRaw, aUidForMove, sToFolderFullNameRaw, bCopy) {
-		if (sFromFolderFullNameRaw !== sToFolderFullNameRaw && isArray(aUidForMove) && aUidForMove.length) {
+		if (sFromFolderFullNameRaw !== sToFolderFullNameRaw && arrayLength(aUidForMove)) {
 			const oFromFolder = getFolderFromCacheList(sFromFolderFullNameRaw),
 				oToFolder = getFolderFromCacheList(sToFolderFullNameRaw);
 
@@ -380,8 +351,8 @@ class AppUser extends AbstractApp {
 			.then(() => promise)
 			.then(
 				() => Remote.foldersReloadWithTimeout(),
-				errorCode => {
-					FolderUserStore.folderListError(getNotification(errorCode, '', errorDefCode));
+				error => {
+					FolderUserStore.folderListError(getNotification(error.code, '', errorDefCode) + '.\n' + error.message);
 					Remote.foldersReloadWithTimeout();
 				}
 			);
@@ -497,32 +468,13 @@ class AppUser extends AbstractApp {
 		});
 	}
 
-	templates() {
-		TemplateUserStore.templates.loading(true);
-
-		Remote.templates((iError, data) => {
-			TemplateUserStore.templates.loading(false);
-
-			if (!iError && isArray(data.Result.Templates)) {
-				delegateRunOnDestroy(TemplateUserStore.templates());
-
-				TemplateUserStore.templates(
-					data.Result.Templates.map(templateData =>
-						TemplateModel.reviveFromJson(templateData)
-					).filter(v => v)
-				);
-			}
-		});
-	}
-
 	quota() {
 		Remote.quota((iError, data) => {
 			if (
 				!iError &&
-				isArray(data.Result) &&
-				1 < data.Result.length &&
-				isPosNumeric(data.Result[0], true) &&
-				isPosNumeric(data.Result[1], true)
+				1 < arrayLength(data.Result) &&
+				isPosNumeric(data.Result[0]) &&
+				isPosNumeric(data.Result[1])
 			) {
 				QuotaUserStore.populateData(pInt(data.Result[1]), pInt(data.Result[0]));
 			}
@@ -537,63 +489,46 @@ class AppUser extends AbstractApp {
 		if (folder && folder.trim()) {
 			Remote.folderInformation(
 				(iError, data) => {
-					if (!iError && data.Result.Hash && data.Result.Folder) {
-						let uid = '',
-							check = false,
-							unreadCountChange = false;
-
-						const folderFromCache = getFolderFromCacheList(data.Result.Folder);
+					if (!iError && data.Result) {
+						const result = data.Result,
+							hash = getFolderHash(result.Folder),
+							folderFromCache = getFolderFromCacheList(result.Folder);
 						if (folderFromCache) {
 							folderFromCache.expires = Date.now();
 
-							if (data.Result.Hash) {
-								setFolderHash(data.Result.Folder, data.Result.Hash);
-							}
+							setFolderHash(result.Folder, result.Hash);
 
-							if (null != data.Result.MessageCount) {
-								folderFromCache.messageCountAll(data.Result.MessageCount);
-							}
+							folderFromCache.messageCountAll(result.MessageCount);
 
-							if (null != data.Result.MessageUnseenCount) {
-								if (pInt(folderFromCache.messageCountUnread()) !== pInt(data.Result.MessageUnseenCount)) {
-									unreadCountChange = true;
-								}
+							let unreadCountChange = (folderFromCache.messageCountUnread() !== result.MessageUnseenCount);
 
-								folderFromCache.messageCountUnread(data.Result.MessageUnseenCount);
-							}
+							folderFromCache.messageCountUnread(result.MessageUnseenCount);
 
 							if (unreadCountChange) {
 								MessageFlagsCache.clearFolder(folderFromCache.fullNameRaw);
 							}
 
-							if (data.Result.Flags) {
-								for (uid in data.Result.Flags) {
-									if (Object.prototype.hasOwnProperty.call(data.Result.Flags, uid)) {
-										check = true;
-										const flags = data.Result.Flags[uid];
-										MessageFlagsCache.storeByFolderAndUid(folderFromCache.fullNameRaw, uid.toString(), [
-											!!flags.IsUnseen,
-											!!flags.IsFlagged,
-											!!flags.IsAnswered,
-											!!flags.IsForwarded,
-											!!flags.IsReadReceipt
-										]);
-									}
-								}
+							if (result.Flags.length) {
+								result.Flags.forEach(flags =>
+									MessageFlagsCache.storeByFolderAndUid(folderFromCache.fullNameRaw, flags.Uid.toString(), [
+										!!flags.IsUnseen,
+										!!flags.IsFlagged,
+										!!flags.IsAnswered,
+										!!flags.IsForwarded,
+										!!flags.IsReadReceipt
+									])
+								);
 
-								if (check) {
-									this.reloadFlagsCurrentMessageListAndMessageFromCache();
-								}
+								this.reloadFlagsCurrentMessageListAndMessageFromCache();
 							}
 
 							MessageUserStore.initUidNextAndNewMessages(
 								folderFromCache.fullNameRaw,
-								data.Result.UidNext,
-								data.Result.NewMessages
+								result.UidNext,
+								result.NewMessages
 							);
 
-							const hash = getFolderHash(data.Result.Folder);
-							if (!hash || unreadCountChange || data.Result.Hash !== hash) {
+							if (!hash || unreadCountChange || result.Hash !== hash) {
 								if (folderFromCache.fullNameRaw === FolderUserStore.currentFolderFullNameRaw()) {
 									this.reloadMessageList();
 								} else if (getFolderInboxName() === folderFromCache.fullNameRaw) {
@@ -614,33 +549,24 @@ class AppUser extends AbstractApp {
 	 */
 	folderInformationMultiply(boot = false) {
 		const folders = FolderUserStore.getNextFolderNames(refreshFolders);
-		if (isNonEmptyArray(folders)) {
+		if (arrayLength(folders)) {
 			Remote.folderInformationMultiply((iError, oData) => {
-				if (!iError && isNonEmptyArray(oData.Result.List)) {
+				if (!iError && arrayLength(oData.Result.List)) {
 					const utc = Date.now();
 					oData.Result.List.forEach(item => {
 						const hash = getFolderHash(item.Folder),
 							folder = getFolderFromCacheList(item.Folder);
-						let unreadCountChange = false;
 
 						if (folder) {
 							folder.expires = utc;
 
-							if (item.Hash) {
-								setFolderHash(item.Folder, item.Hash);
-							}
+							setFolderHash(item.Folder, item.Hash);
 
-							if (null != item.MessageCount) {
-								folder.messageCountAll(item.MessageCount);
-							}
+							folder.messageCountAll(item.MessageCount);
 
-							if (null != item.MessageUnseenCount) {
-								if (pInt(folder.messageCountUnread()) !== pInt(item.MessageUnseenCount)) {
-									unreadCountChange = true;
-								}
+							let unreadCountChange = folder.messageCountUnread() !== item.MessageUnseenCount;
 
-								folder.messageCountUnread(item.MessageUnseenCount);
-							}
+							folder.messageCountUnread(item.MessageUnseenCount);
 
 							if (unreadCountChange) {
 								MessageFlagsCache.clearFolder(folder.fullNameRaw);
@@ -695,7 +621,7 @@ class AppUser extends AbstractApp {
 						folder.messageCountUnread(folder.messageCountUnread() - alreadyUnread);
 					}
 
-					Remote.messageSetSeen(()=>{}, sFolderFullNameRaw, rootUids, true);
+					Remote.messageSetSeen(()=>0, sFolderFullNameRaw, rootUids, true);
 					break;
 
 				case MessageSetAction.UnsetSeen:
@@ -708,7 +634,7 @@ class AppUser extends AbstractApp {
 						folder.messageCountUnread(folder.messageCountUnread() - alreadyUnread + rootUids.length);
 					}
 
-					Remote.messageSetSeen(()=>{}, sFolderFullNameRaw, rootUids, false);
+					Remote.messageSetSeen(()=>0, sFolderFullNameRaw, rootUids, false);
 					break;
 
 				case MessageSetAction.SetFlag:
@@ -716,7 +642,7 @@ class AppUser extends AbstractApp {
 						MessageFlagsCache.storeBySetAction(sFolderFullNameRaw, sSubUid, iSetAction)
 					);
 
-					Remote.messageSetFlagged(()=>{}, sFolderFullNameRaw, rootUids, true);
+					Remote.messageSetFlagged(()=>0, sFolderFullNameRaw, rootUids, true);
 					break;
 
 				case MessageSetAction.UnsetFlag:
@@ -724,7 +650,7 @@ class AppUser extends AbstractApp {
 						MessageFlagsCache.storeBySetAction(sFolderFullNameRaw, sSubUid, iSetAction)
 					);
 
-					Remote.messageSetFlagged(()=>{}, sFolderFullNameRaw, rootUids, false);
+					Remote.messageSetFlagged(()=>0, sFolderFullNameRaw, rootUids, false);
 					break;
 				// no default
 			}
@@ -871,70 +797,38 @@ class AppUser extends AbstractApp {
 	}
 
 	logout() {
-		Remote.logout(() => rl.logoutReload((SettingsGet('ParentEmail')||{length:0}).length));
+		Remote.logout(() => rl.logoutReload(!!SettingsGet('ParentEmail')));
 	}
 
 	bootstart() {
 		super.bootstart();
 
 		addEventListener('resize', () => leftPanelDisabled(ThemeStore.isMobile() || 1000 > innerWidth));
+		addEventListener('beforeunload', event => {
+			if (arePopupsVisible()) {
+				event.preventDefault();
+				return event.returnValue = "Are you sure you want to exit?";
+			}
+		}, {capture: true});
 
-		NotificationUserStore.populate();
-		AccountUserStore.populate();
-		ContactUserStore.populate();
-
-		let contactsSyncInterval = pInt(SettingsGet('ContactsSyncInterval'));
-
-		const startupUrl = pString(SettingsGet('StartupUrl'));
-
-		rl.setWindowTitle();
 		if (SettingsGet('Auth')) {
 			rl.setWindowTitle(i18n('GLOBAL/LOADING'));
+
+			NotificationUserStore.enableSoundNotification(!!SettingsGet('SoundNotification'));
+			NotificationUserStore.enableDesktopNotification(!!SettingsGet('DesktopNotifications'));
+
+			AccountUserStore.email(SettingsGet('Email'));
+			AccountUserStore.parentEmail(SettingsGet('ParentEmail'));
 
 			this.foldersReload(value => {
 				try {
 					if (value) {
-						if (startupUrl) {
-							rl.route.setHash(root(startupUrl), true);
-						}
-
-						if (window.crypto && crypto.getRandomValues && Settings.capa(Capa.OpenPGP)) {
-							const openpgpCallback = () => {
-								if (!window.openpgp) {
-									return false;
-								}
-								PgpUserStore.openpgp = openpgp;
-
-								if (window.Worker) {
-									try {
-										PgpUserStore.openpgp.initWorker({ path: openPgpWorkerJs() });
-									} catch (e) {
-										console.error(e);
-									}
-								}
-
-								PgpUserStore.openpgpKeyring = new openpgp.Keyring();
-								PgpUserStore.capaOpenPGP(true);
-
-								this.reloadOpenPgpKeys();
-
-								return true;
-							};
-
-							if (!openpgpCallback()) {
-								const script = createElement('script', {src:openPgpJs()});
-								script.onload = openpgpCallback;
-								script.onerror = () => console.error(script.src);
-								doc.head.append(script);
-							}
-						} else {
-							PgpUserStore.capaOpenPGP(false);
-						}
+						value = pString(SettingsGet('StartupUrl'));
+						value && rl.route.setHash(root(value), true);
 
 						startScreens([
 							MailBoxUserScreen,
-							Settings.capa(Capa.Settings) ? SettingsUserScreen : null
-							// false ? AboutUserScreen : null
+							SettingsUserScreen
 						]);
 						this.hideLoading();
 
@@ -949,14 +843,9 @@ class AppUser extends AbstractApp {
 						}, refreshFolders);
 
 						// Every 15 minutes
-						setInterval(this.quota, 900000);
-						// Every 20 minutes
-						setInterval(this.foldersReload, 1200000);
+						setInterval(()=>this.quota() | this.foldersReload(), 900000);
 
-						setTimeout(this.contactsSync, 10000);
-						contactsSyncInterval = 5 <= contactsSyncInterval ? contactsSyncInterval : 20;
-						contactsSyncInterval = 320 >= contactsSyncInterval ? contactsSyncInterval : 320;
-						setInterval(this.contactsSync, contactsSyncInterval * 60000 + 5000);
+						ContactUserStore.init();
 
 						this.accountsAndIdentities(true);
 
@@ -965,17 +854,16 @@ class AppUser extends AbstractApp {
 							if (getFolderInboxName() !== cF) {
 								this.folderInformation(cF);
 							}
-							this.folderInformationMultiply(true);
+							this.quota();
+							FolderUserStore.listStatusSupported() || this.folderInformationMultiply(true);
 						}, 1000);
 
-						setTimeout(this.quota, 5000);
-						setTimeout(() => Remote.appDelayStart(()=>{}), 35000);
+						setTimeout(() => Remote.appDelayStart(()=>0), 35000);
 
 						// When auto-login is active
 						if (
-							!!SettingsGet('AccountSignMe') &&
-							navigator.registerProtocolHandler &&
-							Settings.capa(Capa.Composer)
+							SettingsGet('AccountSignMe') &&
+							navigator.registerProtocolHandler
 						) {
 							setTimeout(() => {
 								try {
@@ -986,9 +874,8 @@ class AppUser extends AbstractApp {
 									);
 								} catch (e) {} // eslint-disable-line no-empty
 
-								if (SettingsGet('MailToEmail')) {
-									mailToHelper(SettingsGet('MailToEmail'));
-								}
+								value = SettingsGet('MailToEmail');
+								value && mailToHelper(value);
 							}, 500);
 						}
 
@@ -998,6 +885,27 @@ class AppUser extends AbstractApp {
 						SettingsUserStore.delayLogout();
 
 						setTimeout(() => this.initVerticalLayoutResizer(), 1);
+
+						setInterval(this.reloadTime(), 60000);
+
+						if (window.crypto && crypto.getRandomValues && Settings.capa(Capa.OpenPGP)) {
+							const script = createElement('script', {src:openPgpJs()});
+							script.onload = () => {
+								PgpUserStore.openpgp = openpgp;
+								if (window.Worker) {
+									try {
+										PgpUserStore.openpgp.initWorker({ path: openPgpWorkerJs() });
+									} catch (e) {
+										console.error(e);
+									}
+								}
+								PgpUserStore.openpgpKeyring = new openpgp.Keyring();
+								PgpUserStore.capaOpenPGP(true);
+								this.reloadOpenPgpKeys();
+							};
+							script.onerror = () => console.error(script.src);
+							doc.head.append(script);
+						}
 					} else {
 						this.logout();
 					}
@@ -1010,20 +918,18 @@ class AppUser extends AbstractApp {
 			startScreens([LoginUserScreen]);
 			this.hideLoading();
 		}
-
-		setInterval(this.reloadTime(), 60000);
 	}
 
 	reloadTime()
 	{
 		setTimeout(() =>
-			doc.querySelectorAll('[data-bind*="moment:"]').forEach(element => timeToNode(element))
+			doc.querySelectorAll('time').forEach(element => timeToNode(element))
 			, 1)
 	}
 
 	showMessageComposer(params = [])
 	{
-		Settings.capa(Capa.Composer) && showScreenPopup(ComposePopupView, params);
+		showScreenPopup(ComposePopupView, params);
 	}
 }
 

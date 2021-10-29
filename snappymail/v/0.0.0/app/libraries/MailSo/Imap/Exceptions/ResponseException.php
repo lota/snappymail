@@ -27,9 +27,15 @@ class ResponseException extends \MailSo\Imap\Exceptions\Exception
 	{
 		$this->oResponses = $oResponses;
 		if (!$sMessage && $response = $this->GetLastResponse()) {
-			$sMessage = $response->OptionalResponse[0] . ' ' . $response->HumanReadable;
+			$sMessage = ($response->OptionalResponse[0] ?? '') . ' ' . $response->HumanReadable;
 		}
 		parent::__construct($sMessage, $iCode, $oPrevious);
+	}
+
+	public function GetResponseStatus() : ?string
+	{
+		$oItem = $this->GetLastResponse();
+		return $oItem && $oItem->IsStatusResponse ? $oItem->StatusOrIndex : null;
 	}
 
 	public function GetResponses() : ?\MailSo\Imap\ResponseCollection
@@ -39,9 +45,6 @@ class ResponseException extends \MailSo\Imap\Exceptions\Exception
 
 	public function GetLastResponse() : ?\MailSo\Imap\Response
 	{
-		if ($this->oResponses && \count($this->oResponses)) {
-			return $this->oResponses[count($this->oResponses) - 1];
-		}
-		return null;
+		return $this->oResponses ? $this->oResponses->getLast() : null;
 	}
 }

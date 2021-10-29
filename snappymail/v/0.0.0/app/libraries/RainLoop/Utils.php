@@ -72,7 +72,7 @@ class Utils
 		$sToken = static::GetCookie($sKey, null);
 		if (null === $sToken)
 		{
-			$sToken = \MailSo\Base\Utils::Md5Rand(APP_SALT);
+			$sToken = \MailSo\Base\Utils::Sha1Rand(APP_SALT);
 			static::SetCookie($sKey, $sToken, \time() + 60 * 60 * 24 * 30);
 		}
 
@@ -81,7 +81,7 @@ class Utils
 
 	public static function Fingerprint() : string
 	{
-		return \md5(empty($_SERVER['HTTP_USER_AGENT']) ? 'RainLoopFingerprint' : $_SERVER['HTTP_USER_AGENT']);
+		return \md5($_SERVER['HTTP_USER_AGENT'] ?: 'RainLoopFingerprint');
 	}
 
 	public static function GetShortToken() : string
@@ -89,9 +89,9 @@ class Utils
 		$sKey = 'rlsession';
 
 		$sToken = static::GetCookie($sKey, null);
-		if (null === $sToken)
+		if (!$sToken)
 		{
-			$sToken = \MailSo\Base\Utils::Md5Rand(APP_SALT);
+			$sToken = \MailSo\Base\Utils::Sha1Rand(APP_SALT);
 			static::SetCookie($sKey, $sToken, 0);
 		}
 
@@ -131,31 +131,6 @@ class Utils
 		return $sResult;
 	}
 
-	public static function FolderFiles(string $sDir, string $sType = '') : array
-	{
-		$aResult = array();
-		if (\is_dir($sDir))
-		{
-			if (false !== ($rDirHandle = \opendir($sDir)))
-			{
-				while (false !== ($sFile = \readdir($rDirHandle)))
-				{
-					if (empty($sType) || $sType === \substr($sFile, -\strlen($sType)))
-					{
-						if (\is_file($sDir.'/'.$sFile))
-						{
-							$aResult[] = $sFile;
-						}
-					}
-				}
-
-				\closedir($rDirHandle);
-			}
-		}
-
-		return $aResult;
-	}
-
 	public static function ClearHtmlOutput(string $sHtml) : string
 	{
 //		return $sHtml;
@@ -164,20 +139,6 @@ class Utils
 			['">', '&nbsp;', '&nbsp;', ' ', '><'],
 			\trim($sHtml)
 		);
-	}
-
-	public static function CompileTemplates(array &$aList, string $sDirName, string $sNameSuffix = '')
-	{
-		if (\file_exists($sDirName))
-		{
-			$aFileList = static::FolderFiles($sDirName, '.html');
-
-			foreach ($aFileList as $sName)
-			{
-				$sTemplateName = \substr($sName, 0, -5).$sNameSuffix;
-				$aList[$sTemplateName] = $sDirName.'/'.$sName;
-			}
-		}
 	}
 
 	/**
@@ -189,25 +150,15 @@ class Utils
 		return isset($_COOKIE[$sName]) ? $_COOKIE[$sName] : $mDefault;
 	}
 
-	public static function SetCookie(string $sName, string $sValue = '', int $iExpire = 0, ?string $sPath = null, ?string $sDomain = null, ?bool $bSecure = null, bool $bHttpOnly = true)
+	public static function SetCookie(string $sName, string $sValue = '', int $iExpire = 0, bool $bHttpOnly = true)
 	{
-		if (null === $sPath)
-		{
-			$sPath = static::$CookieDefaultPath;
-			$sPath = $sPath && 0 < \strlen($sPath) ? $sPath : '/';
-		}
-
-		if (null === $bSecure)
-		{
-			$bSecure = static::$CookieDefaultSecure;
-		}
-
+		$sPath = static::$CookieDefaultPath;
 		$_COOKIE[$sName] = $sValue;
 		\setcookie($sName, $sValue, array(
 			'expires' => $iExpire,
-			'path' => $sPath,
+			'path' => $sPath && 0 < \strlen($sPath) ? $sPath : '/',
 //			'domain' => $sDomain,
-			'secure' => $bSecure,
+			'secure' => isset($_SERVER['HTTPS']) || static::$CookieDefaultSecure,
 			'httponly' => $bHttpOnly,
 			'samesite' => 'Strict'
 		));
@@ -222,7 +173,7 @@ class Utils
 				'expires' => \time() - 3600 * 24 * 30,
 				'path' => $sPath && 0 < \strlen($sPath) ? $sPath : '/',
 //				'domain' => null,
-				'secure' => static::$CookieDefaultSecure,
+				'secure' => isset($_SERVER['HTTPS']) || static::$CookieDefaultSecure,
 				'httponly' => true,
 				'samesite' => 'Strict'
 			));

@@ -108,7 +108,7 @@
 		}
 
 		.informationShort {
-			margin: 4px 50px 0 5px;
+			margin: 4px 40px 0 0;
 			overflow: hidden;
 			text-overflow: ellipsis;
 
@@ -120,8 +120,6 @@
 		.informationShortWrp {
 			max-height: 100px;
 			overflow-y: auto;
-			min-height: 30px;
-			margin-top: 4px;
 		}
 
 		.informationFull {
@@ -129,11 +127,8 @@
 
 
 			table {
-				width: 100%;
-			}
-
-			table, tr, td {
 				border-spacing: 0;
+				width: 100%;
 			}
 
 			td {
@@ -147,10 +142,6 @@
 				text-align: right;
 				white-space: nowrap;
 				width: 1%;
-			}
-
-			.labelTo {
-				white-space: nowrap;
 			}
 
 			td + td {
@@ -167,6 +158,12 @@
 
 		&.emptySubject .emptySubjectText {
 			display: inline;
+		}
+
+		.hasVirus {
+			background: #f00;
+			color: #fff;
+			padding: 3px;
 		}
 	}
 
@@ -213,10 +210,6 @@
 			font-size: 24px;
 			color: grey;
 			padding-top: 50px;
-		}
-
-		.line-loading {
-			height: 5px;
 		}
 
 		.showImages, .readReceipt, .pgpSigned, .pgpEncrypted {
@@ -458,7 +451,7 @@
 		}
 	}
 
-	&.message-focused .b-content {
+	&.focused .b-content {
 		z-index: 101;
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 		border-color: darken(@rlMainDarkColor, 5%);
