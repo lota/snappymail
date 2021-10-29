@@ -124,9 +124,10 @@ export const
 	 * @param {number=} threadUid = 0
 	 * @returns {string}
 	 */
-	mailBox = (folder, page = 1, search = '', threadUid = 0) => {
+	mailBox = (folder, page, search, threadUid, messageUid) => {
 		page = pInt(page, 1);
 		search = pString(search);
+		threadUid = pInt(threadUid, 0);
 
 		let result = HASH_PREFIX + 'mailbox/';
 
@@ -134,27 +135,20 @@ export const
 			result += encodeURI(folder) + (threadUid ? '~' + threadUid : '');
 		}
 
-		if (1 < page) {
-			result = result.replace(/\/+$/, '') + '/p' + page;
-		}
-
-		if (search) {
-			result = result.replace(/\/+$/, '') + '/' + encodeURI(search);
+		if (messageUid) {
+			result = result.replace(/[/]+$/, '') + '/m' + messageUid;
+		} else {
+			if (1 < page) {
+				result = result.replace(/\/+$/, '') + '/p' + page;
+			}
+			if (search) {
+				result = result.replace(/\/+$/, '') + '/' + encodeURI(search);
+			}
 		}
 
 		return result;
 	},
 
-	mailBoxMessage = (folder, messageUid = '') => {
-		let result = HASH_PREFIX + 'mailbox/';
-
-		if (folder) {
-			result += encodeURI(folder);
-		}
-
-		if (messageUid) {
-			result = result.replace(/[/]+$/, '') + '/m' + messageUid;
-		}
-
-		return result;
+	mailBoxMessage = (folder, messageUid) => {
+		return mailBox(folder, 1, '', 0, pInt(messageUid));
 	};
