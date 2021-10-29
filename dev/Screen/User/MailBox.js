@@ -64,7 +64,7 @@ export class MailBoxUserScreen extends AbstractScreen {
 		const folder = getFolderFromCacheList(getFolderFullNameRaw(folderHash.replace(/~([\d]+)$/, '')));
 		if (folder) {
 			if (messageUid) {
-//				rl.route.setHash(mailBox(folderHash, 1));
+//				rl.route.setHash(mailBox(folderHash));
 				FolderUserStore.currentFolder(folder);
 				MessageUserStore.selectMessageByFolderAndUid(folderHash, messageUid);
 			} else {
